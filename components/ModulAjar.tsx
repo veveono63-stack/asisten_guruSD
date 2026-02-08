@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Teacher, SchoolIdentity, ModulAjarData, ModulAjar, ProsemData, ProsemRow } from '../types';
 import { getModulAjar, updateModulAjar, getTeacherProfile, getSchoolIdentity, getSubjects, getProsem, pullModulAjarToTeacher } from '../services/adminService';
@@ -481,7 +482,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             addLabelValue("Materi/Tema", topicData.topic);
             addLabelValue("Kelas/Fase/Semester", `${selectedClass.replace('Kelas ', '')} / ${phase} / ${selectedSemester}`);
             addLabelValue("Tahun Pelajaran", selectedYear); // Positioned above Alokasi Waktu
-            addLabelValue("Alokasi Waktu", `${topicData.totalJp} JP (${topicData.meetingDates.length} Kali Pertemuan)`); // Now at the bottom
+            addLabelValue("Alokasi Waktu", `${topicData.totalJp} JP (${topicData.meetingDates.length} Kali Pertemuan)`); // Positioned at the bottom
             y += 5;
 
             addSectionHeader("A. IDENTIFIKASI PEMBELAJARAN");
@@ -679,9 +680,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                                         <div className="grid grid-cols-1 gap-4">
                                             <Field label="Tujuan Pembelajaran (dari ATP)" value={modulAjarData[topicId]?.tujuanPembelajaran} onChange={v => handleFormChange(topicId, 'tujuanPembelajaran', v)} />
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* COMMENT: Fixed missing name 'handlePlanChange' by using 'handleFormChange' */}
                                                 <Field label="Model Pembelajaran" value={modulAjarData[topicId]?.modelPembelajaran} onChange={v => handleFormChange(topicId, 'modelPembelajaran', v)} />
-                                                {/* COMMENT: Fixed missing name 'handlePlanChange' by using 'handleFormChange' */}
                                                 <Field label="Metode Pembelajaran" value={modulAjarData[topicId]?.metodePembelajaran} onChange={v => handleFormChange(topicId, 'metodePembelajaran', v)} />
                                             </div>
                                             <Field label="Kemitraan Pembelajaran" value={modulAjarData[topicId]?.kemitraan} onChange={v => handleFormChange(topicId, 'kemitraan', v)} />

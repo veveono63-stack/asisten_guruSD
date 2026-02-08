@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { PencilIcon, SparklesIcon, TrashIcon, ArrowDownTrayIcon, ChevronDownIcon, XCircleIcon, ArrowPathIcon } from './Icons';
 import { KokurikulerTheme, KokurikulerActivity, KokurikulerDimension, Subject, KokurikulerPlanning, SchoolIdentity, Teacher } from '../types';
@@ -1021,7 +1022,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
         try {
             const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] }); // F4
-            const margin = { top: 10, left: 25, right: 15, bottom: 7 }; // Adjusted Top margin to 1cm, Bottom to 0.7cm
+            const margin = { top: 10, left: 25, right: 15, bottom: 7 }; // Adjusted Top margin to 1cm
             const pageWidth = 215;
             const contentWidth = pageWidth - margin.left - margin.right;
             let y = margin.top;
@@ -1067,14 +1068,14 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
             pdf.text("PERENCANAAN KEGIATAN KOKURIKULER", pageWidth / 2, y, { align: 'center' });
             y += 10;
 
-            // Identity Helpers with robust wrapping
+            // Identity Helpers with robust wrapping (Labels NORMAL font as requested)
             const addLabelValue = (label: string, value: string) => {
                 const labelWidth = 45;
                 const valueWidth = contentWidth - labelWidth;
                 const valueX = margin.left + labelWidth;
 
                 checkPageBreak(6);
-                pdf.setFont('helvetica', 'bold');
+                pdf.setFont('helvetica', 'normal'); // Changed to NORMAL font for labels
                 pdf.text(label, margin.left, y);
                 pdf.setFont('helvetica', 'normal');
                 pdf.text(": ", valueX - 3, y);
@@ -1183,8 +1184,8 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
             pdf.setFont('helvetica', 'bold'); pdf.text("Asesmen Akhir Pembelajaran", margin.left, y); y += 6;
             y = printMixedText(plan.asesmenSumatif, margin.left + 5, y, contentWidth - 5, 6);
 
-            // Signature with 1 blank line gap after the last assessment text
-            y += 12; // Adjusted distance for exactly one blank line gap (roughly 2*lineheight)
+            // Signature with 1 blank line gap after the last assessment text (Requested exactly 1 blank line = roughly 12mm)
+            y += 12; 
             checkPageBreak(45);
             const formattedDate = new Date(signatureDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
             const teacherX = pageWidth - margin.right - 60;
@@ -1560,7 +1561,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                                                             <ArrowDownTrayIcon className="w-4 h-4"/> PDF
                                                         </button>
                                                         {isPdfDropdownOpen && (
-                                                            <div className="absolute left-0 bottom-full mb-2 w-48 bg-white border rounded shadow-lg z-10" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
+                                                            <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-10" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
                                                                 <button onClick={() => handleDownloadTab3PDF('none')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Tanpa TTD</button>
                                                                 <button onClick={() => handleDownloadTab3PDF('teacher')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Wali Kelas</button>
                                                                 <button onClick={() => handleDownloadTab3PDF('both')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Wali Kelas & KS</button>
