@@ -447,6 +447,7 @@ export interface KokurikulerPlanning {
     // G. Kegiatan (Per minggu)
     kegiatanMingguan: { mingguKe: number; deskripsi: string }[];
     // H. Asesmen
+    asesmenAwal: string;
     asesmenFormatif: string;
     asesmenSumatif: string;
 }

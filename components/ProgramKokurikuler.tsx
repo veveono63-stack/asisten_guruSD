@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { PencilIcon, SparklesIcon, TrashIcon, ArrowDownTrayIcon, ChevronDownIcon, XCircleIcon, ArrowPathIcon } from './Icons';
 import { KokurikulerTheme, KokurikulerActivity, KokurikulerDimension, Subject, KokurikulerPlanning, SchoolIdentity, Teacher } from '../types';
@@ -16,6 +15,17 @@ interface ProgramKokurikulerProps {
 }
 
 type TabType = 'tema' | 'kegiatan' | 'perencanaan';
+
+const PROFIL_LULUSAN_OPTIONS = [
+    "Keimanan dan Ketakwaan",
+    "Kewargaan",
+    "Penalaran Kritis",
+    "Kreativitas",
+    "Kolaborasi",
+    "Kemandirian",
+    "Kesehatan",
+    "Komunikasi"
+];
 
 // Data Statis Dimensi Profil Pelajar Pancasila & Sub-elemen
 const DIMENSIONS_DATA: { [key: string]: string[] } = {
@@ -678,19 +688,33 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
 
     const handlePlanChange = (field: keyof KokurikulerPlanning, value: any) => {
         if (!activeActivityId) return;
-        setPlanningData(prev => ({
-            ...prev,
-            [activeActivityId]: {
-                ...prev[activeActivityId],
+        setPlanningData(prev => {
+            const currentPlan = prev[activeActivityId] || {
                 activityId: activeActivityId,
-                [field]: value
-            }
-        }));
+                modelPembelajaran: '',
+                metodePembelajaran: '',
+                ruangFisik: '',
+                budayaBelajar: '',
+                kemitraan: '',
+                digital: '',
+                kegiatanMingguan: [],
+                asesmenAwal: '',
+                asesmenFormatif: '',
+                asesmenSumatif: '',
+            };
+            return {
+                ...prev,
+                [activeActivityId]: {
+                    ...currentPlan,
+                    [field]: value
+                }
+            };
+        });
     };
 
     const handleWeeklyActivityChange = (index: number, value: string) => {
         if (!activeActivityId) return;
-        const currentPlan = planningData[activeActivityId] || {};
+        const currentPlan = (planningData[activeActivityId] || {}) as KokurikulerPlanning;
         const activities = [...(currentPlan.kegiatanMingguan || [])];
         if (activities[index]) {
             activities[index] = { ...activities[index], deskripsi: value };
@@ -742,7 +766,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                 - Alokasi Waktu: ${activity.activityJp} JP (${totalWeeks} Minggu Efektif).
                 - Dimensi Terkait: ${activity.dimensions.map(d => `${d.name}`).join(', ')}.
 
-                Instruksi Pengisian:
+                Instruksi Pengisian (SANGAT KETAT):
                 1. **Praktik Pedagogis**: Tentukan Model (misal: PBL) dan Metode (misal: Diskusi) yang sesuai.
                 2. **Lingkungan Belajar**: Deskripsikan setting Ruang Fisik/Virtual dan Budaya Belajar yang mendukung.
                 3. **Kemitraan**: Siapa saja yang terlibat (Guru Kelas, Guru Mapel lain, Orang tua, Mitra luar).
@@ -751,10 +775,11 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                    - Buat rencana untuk ${totalWeeks} minggu.
                    - Setiap minggu harus berisi minimal 5 langkah konkret dan berurutan.
                    - Gunakan penomoran 1., 2., 3. dst.
-                   - **CRITICAL**: Pisahkan setiap langkah dengan baris baru (newline / '\\n'). Jangan digabung dalam satu paragraf.
+                   - **WAJIB & KRITIKAL**: Gunakan karakter newline (\\n) secara eksplisit di SETIAP akhir langkah kegiatan. JANGAN menggabung langkah-langkah dalam satu baris paragraf panjang.
                 6. **Asesmen**:
-                   - Formatif: Teknik penilaian proses (misal: Jurnal, Observasi). Gunakan numbering jika lebih dari satu, pisahkan dengan baris baru.
-                   - Sumatif: Teknik penilaian akhir (misal: Pameran Karya, Rubrik Produk). Gunakan numbering jika lebih dari satu, pisahkan dengan baris baru.
+                   - Awal: Pertanyaan pemantik atau observasi awal.
+                   - Formatif: Teknik penilaian proses (misal: Jurnal, Observasi). Gunakan penomoran dan pisahkan setiap poin dengan \\n.
+                   - Sumatif: Teknik penilaian akhir (misal: Pameran Karya, Rubrik Produk). Gunakan penomoran dan pisahkan setiap poin dengan \\n.
 
                 Output JSON:
                 {
@@ -765,12 +790,12 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                     "kemitraan": "...",
                     "digital": "...",
                     "kegiatanMingguan": [
-                        { "mingguKe": 1, "deskripsi": "1. Langkah satu...\n2. Langkah dua..." },
+                        { "mingguKe": 1, "deskripsi": "1. Langkah satu...\\n2. Langkah dua...\\n3. Langkah tiga...\\n4. Langkah empat...\\n5. Langkah lima..." },
                         { "mingguKe": 2, "deskripsi": "..." }
-                        // ... lanjutkan sampai minggu ke-${totalWeeks}
                     ],
-                    "asesmenFormatif": "1. Observasi...\n2. Jurnal...",
-                    "asesmenSumatif": "1. Pameran...\n2. Portofolio..."
+                    "asesmenAwal": "...",
+                    "asesmenFormatif": "1. Observasi...\\n2. Jurnal...",
+                    "asesmenSumatif": "1. Pameran...\\n2. Portofolio..."
                 }
             `;
 
@@ -799,10 +824,11 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                                     required: ["mingguKe", "deskripsi"]
                                 }
                             },
+                            asesmenAwal: { type: Type.STRING },
                             asesmenFormatif: { type: Type.STRING },
                             asesmenSumatif: { type: Type.STRING }
                         },
-                        required: ["modelPembelajaran", "metodePembelajaran", "ruangFisik", "budayaBelajar", "kemitraan", "digital", "kegiatanMingguan", "asesmenFormatif", "asesmenSumatif"]
+                        required: ["modelPembelajaran", "metodePembelajaran", "ruangFisik", "budayaBelajar", "kemitraan", "digital", "kegiatanMingguan", "asesmenAwal", "asesmenFormatif", "asesmenSumatif"]
                     }
                 }
             });
@@ -944,9 +970,9 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
 
                 if (signatureOption === 'both') {
                     pdf.text('Mengetahui,', principalX, y, { align: 'center' });
-                    pdf.text('Kepala Sekolah', principalX, y + 6, { align: 'center' });
+                    pdf.text('Kepala Sekolah', principalX, y + 5, { align: 'center' });
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalX, y + 28, { align: 'center' });
+                    pdf.text(schoolIdentity.principalName, principalX, y + 25, { align: 'center' });
                     pdf.setFont('helvetica', 'normal');
                     pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalX, y + 34, { align: 'center' });
                 }
@@ -989,229 +1015,197 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
 
         setIsGeneratingPDF(true); 
         setIsPdfDropdownOpen(false);
-        setNotification({ message: 'Mempersiapkan PDF...', type: 'info' });
+        setNotification({ message: 'Mempersiapkan PDF Perencanaan...', type: 'info' });
         await new Promise(r => setTimeout(r, 50));
 
         try {
             const { jsPDF } = jspdf;
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] });
-            const margin = { top: 15, left: 20, right: 15, bottom: 15 };
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] }); // F4
+            const margin = { top: 10, left: 25, right: 15, bottom: 7 }; // Adjusted Top margin to 1cm, Bottom to 0.7cm
             const pageWidth = 215;
-            const pageHeight = 330; // F4
             const contentWidth = pageWidth - margin.left - margin.right;
             let y = margin.top;
 
-            // Helper to add text block
-            const addTextBlock = (title: string, text: string, indent: number = 7) => {
-                if (y > 310) { pdf.addPage(); y = margin.top; }
-                pdf.setFont('helvetica', 'bold');
-                pdf.setFontSize(11);
-                pdf.text(title, margin.left, y);
-                y += 5;
-                pdf.setFont('helvetica', 'normal');
-                pdf.setFontSize(11);
-                
-                // Indent content text
-                const contentX = margin.left + indent;
-                const availableWidth = contentWidth - indent;
-
-                // Handle simple text (splitTextToSize wraps it)
-                // But for lists inside we want hanging indent
-                y = printMixedText(text, contentX, y, availableWidth, 5, indent);
-                y += 5;
+            const checkPageBreak = (needed: number) => {
+                if (y + needed > 330 - margin.bottom) { 
+                    pdf.addPage(); 
+                    y = margin.top + 10; 
+                    return true;
+                }
+                return false;
             };
 
-            const addLabelValue = (label: string, value: string) => {
-                pdf.setFont('helvetica', 'normal');
-                pdf.text(label, margin.left, y);
-                pdf.text(": " + value, margin.left + 40, y);
-                y += 6;
-            };
-            
-            // Logic for wrapping value next to label (for Pedagogis)
-            const addWrappedLabelValue = (label: string, value: string, indent: number) => {
-                pdf.text(label, margin.left + indent, y);
-                const labelWidth = pdf.getStringUnitWidth(label) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
-                const valueX = margin.left + indent + labelWidth + 2;
-                const valueWidth = contentWidth - (indent + labelWidth + 2);
-                const lines = pdf.splitTextToSize(value || '-', valueWidth);
-                pdf.text(lines, valueX, y);
-                y += (lines.length * 5) + 2;
-            }
-
-            // Improved text printer with hanging indent support
-            const printMixedText = (text: string, x: number, startY: number, maxWidth: number, lineHeight: number, baseIndent: number): number => {
+            const printMixedText = (text: string, x: number, startY: number, maxWidth: number, lineHeight: number): number => {
                 const lines = (text || '-').split('\n');
                 let cursorY = startY;
-
                 lines.forEach(line => {
                     const cleanLine = line.trim();
-                    if (!cleanLine) {
-                        cursorY += lineHeight;
-                        return;
-                    }
-
-                    // Detect bullet or number at start
-                    // Matches: "1. ", "1)", "a.", "•", "-", "*"
+                    if (!cleanLine) { cursorY += lineHeight; return; }
+                    
+                    // Detect list markers
                     const match = cleanLine.match(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[•\-\*])\s/);
                     let hangingIndent = 0;
                     if (match) {
-                        const marker = match[0];
-                        hangingIndent = pdf.getStringUnitWidth(marker) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+                        hangingIndent = pdf.getStringUnitWidth(match[0]) * 11 / pdf.internal.scaleFactor;
                     }
 
-                    // Split long line into wrapped lines
                     const wrappedLines = pdf.splitTextToSize(cleanLine, maxWidth);
-                    
-                    wrappedLines.forEach((wLine: string, index: number) => {
-                        // Check Page Break
-                        if (cursorY > 310) { // Limit set to 310mm to avoid cutting off at bottom
-                            pdf.addPage();
-                            cursorY = margin.top;
-                        }
-
-                        let printX = x;
-                        // If it's a wrapped line (index > 0) of a bulleted item, indent it to align with text
-                        if (index > 0 && hangingIndent > 0) {
-                            printX = x + hangingIndent;
-                        }
-
-                        pdf.text(wLine, printX, cursorY);
+                    wrappedLines.forEach((wLine: string, idx: number) => {
+                        checkPageBreak(lineHeight);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(11);
+                        pdf.text(wLine, idx > 0 ? x + hangingIndent : x, cursorY);
                         cursorY += lineHeight;
                     });
                 });
-                
                 return cursorY;
             };
 
-            // HEADER
-            pdf.setFont('helvetica', 'bold');
+            // Title
+            pdf.setFont('helvetica', 'bold'); 
             pdf.setFontSize(12);
             pdf.text("PERENCANAAN KEGIATAN KOKURIKULER", pageWidth / 2, y, { align: 'center' });
             y += 10;
 
-            // IDENTITY
-            pdf.setFontSize(11);
-            pdf.setFont('helvetica', 'normal');
-            addLabelValue("Satuan Pendidikan", schoolIdentity.schoolName);
-            addLabelValue("Kelas", selectedClass.replace('Kelas ', ''));
-            addLabelValue("Fase", phaseInfo.phase);
-            addLabelValue("Tema", theme.name);
-            
-            // Handle multi-line activity name
-            const activityNameLines = pdf.splitTextToSize(": " + activity.name, contentWidth - 40);
-            pdf.text("Nama Kegiatan", margin.left, y);
-            pdf.text(activityNameLines, margin.left + 40, y);
-            y += (activityNameLines.length * 6);
+            // Identity Helpers with robust wrapping
+            const addLabelValue = (label: string, value: string) => {
+                const labelWidth = 45;
+                const valueWidth = contentWidth - labelWidth;
+                const valueX = margin.left + labelWidth;
 
+                checkPageBreak(6);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(label, margin.left, y);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(": ", valueX - 3, y);
+                
+                const lines = pdf.splitTextToSize(value || '-', valueWidth);
+                lines.forEach((line: string) => {
+                    checkPageBreak(6);
+                    pdf.text(line, valueX, y);
+                    y += 6;
+                });
+            };
+
+            const phase = selectedClass.includes('I') || selectedClass.includes('II') ? 'A' : (selectedClass.includes('III') || selectedClass.includes('IV') ? 'B' : 'C');
+
+            addLabelValue("Satuan Pendidikan", schoolIdentity.schoolName);
+            addLabelValue("Nama Penyusun", teacher.fullName);
+            addLabelValue("Tema", theme.name);
+            addLabelValue("Kegiatan", activity.name);
+            addLabelValue("Kelas/Fase/Semester", `${selectedClass.replace('Kelas ', '')} / ${phase} / ${selectedSemester}`);
+            addLabelValue("Tahun Pelajaran", selectedYear);
             addLabelValue("Alokasi Waktu", `${activity.activityJp} JP`);
-            y += 2; // Reduced gap
+            y += 5;
+
+            // A. IDENTIFIKASI PEMBELAJARAN
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("A. IDENTIFIKASI PEMBELAJARAN", margin.left, y); y += 6;
+            pdf.setFont('helvetica', 'normal'); pdf.text("Dimensi Profil Lulusan:", margin.left, y); y += 6;
+            PROFIL_LULUSAN_OPTIONS.forEach((dim, index) => {
+                checkPageBreak(6);
+                const isChecked = activity.dimensions.some(d => d.name.toLowerCase().includes(dim.toLowerCase()) || dim.toLowerCase().includes(d.name.toLowerCase()));
+                const currentX = index % 2 === 0 ? margin.left + 5 : margin.left + 90;
+                pdf.setDrawColor(0); pdf.setLineWidth(0.2);
+                pdf.rect(currentX, y - 4, 4, 4);
+                if (isChecked) { pdf.setFont('zapfdingbats'); pdf.text('3', currentX + 0.5, y - 0.5); }
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(11);
+                pdf.text(dim, currentX + 6, y);
+                if (index % 2 !== 0 || index === PROFIL_LULUSAN_OPTIONS.length - 1) y += 6;
+            });
+            y += 5;
+
+            // B. DESAIN PEMBELAJARAN
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("B. DESAIN PEMBELAJARAN", margin.left, y); y += 6;
+            pdf.text("Tujuan Pembelajaran:", margin.left, y); y += 6;
+            pdf.setFont('helvetica', 'normal');
+            y = printMixedText(activity.goal, margin.left + 5, y, contentWidth - 5, 6);
+            y += 2;
             
-            pdf.setLineWidth(0.5);
-            pdf.line(margin.left, y, pageWidth - margin.right, y);
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("Praktik Pedagogis", margin.left, y); y += 6;
+            pdf.setFont('helvetica', 'normal');
+            pdf.text("Model : ", margin.left + 5, y);
+            y = printMixedText(plan.modelPembelajaran, margin.left + 25, y, contentWidth - 25, 6);
+            checkPageBreak(6);
+            pdf.text("Metode : ", margin.left + 5, y);
+            y = printMixedText(plan.metodePembelajaran, margin.left + 25, y, contentWidth - 25, 6);
+            
+            y += 2;
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("Kemitraan Pembelajaran", margin.left, y); y += 6;
+            pdf.setFont('helvetica', 'normal');
+            y = printMixedText(plan.kemitraan, margin.left + 5, y, contentWidth - 5, 6);
+            
+            y += 2;
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("Lingkungan Pembelajaran", margin.left, y); y += 6;
+            pdf.setFont('helvetica', 'normal');
+            pdf.text("Ruang Fisik/Virtual : ", margin.left + 5, y);
+            y = printMixedText(plan.ruangFisik, margin.left + 45, y, contentWidth - 45, 6);
+            checkPageBreak(6);
+            pdf.text("Budaya Belajar : ", margin.left + 5, y);
+            y = printMixedText(plan.budayaBelajar, margin.left + 45, y, contentWidth - 45, 6);
+            
+            y += 2;
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("Pemanfaatan Digital", margin.left, y); y += 6;
+            pdf.setFont('helvetica', 'normal');
+            y = printMixedText(plan.digital, margin.left + 5, y, contentWidth - 5, 6);
             y += 8;
 
-            // Content Sections
-            // A. DIMENSI PROFIL LULUSAN
-            const contentIndent = 6; 
-
-            addTextBlock("A. DIMENSI PROFIL LULUSAN", 
-                activity.dimensions.map(d => `• ${d.name}: ${d.elements.join(', ')}`).join('\n'), 
-                contentIndent
-            );
-
-            addTextBlock("B. TUJUAN KEGIATAN", activity.goal, contentIndent);
-
-            pdf.setFont('helvetica', 'bold');
-            pdf.text("C. PRAKTIK PEDAGOGIS", margin.left, y);
-            y += 5;
-            pdf.setFont('helvetica', 'normal');
-            addWrappedLabelValue("Model:", plan.modelPembelajaran, contentIndent);
-            addWrappedLabelValue("Metode:", plan.metodePembelajaran, contentIndent);
-            y += 4; // Extra spacing
-
-            pdf.setFont('helvetica', 'bold');
-            pdf.text("D. LINGKUNGAN BELAJAR", margin.left, y);
-            y += 5;
-            pdf.setFont('helvetica', 'normal');
-            addWrappedLabelValue("Ruang Fisik/Virtual:", plan.ruangFisik, contentIndent);
-            addWrappedLabelValue("Budaya Belajar:", plan.budayaBelajar, contentIndent);
-            y += 4;
-
-            addTextBlock("E. KEMITRAAN PEMBELAJARAN", plan.kemitraan, contentIndent);
-            addTextBlock("F. PEMANFAATAN DIGITAL", plan.digital, contentIndent);
-
-            // G. KEGIATAN MINGGUAN
-            if (y > 310) { pdf.addPage(); y = margin.top; }
-            pdf.setFont('helvetica', 'bold');
-            pdf.text("G. KEGIATAN MINGGUAN", margin.left, y);
-            y += 6;
-            pdf.setFont('helvetica', 'normal');
+            // C. PENGALAMAN BELAJAR
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("C. PENGALAMAN BELAJAR", margin.left, y); y += 6;
             if (plan.kegiatanMingguan && plan.kegiatanMingguan.length > 0) {
                 plan.kegiatanMingguan.forEach(week => {
-                    if (y > 310) { pdf.addPage(); y = margin.top; }
+                    checkPageBreak(12);
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(`Minggu ke-${week.mingguKe}`, margin.left + contentIndent, y);
-                    y += 5;
-                    pdf.setFont('helvetica', 'normal');
-                    // Use printMixedText to handle hanging indents within weekly activities
-                    y = printMixedText(week.deskripsi, margin.left + contentIndent, y, contentWidth - contentIndent, 5, contentIndent);
+                    pdf.text(`Minggu ke-${week.mingguKe}`, margin.left + 5, y); y += 6;
+                    y = printMixedText(week.deskripsi, margin.left + 5, y, contentWidth - 5, 6);
                     y += 4;
                 });
-            } else {
-                pdf.text("-", margin.left + contentIndent, y);
-                y += 6;
             }
-            y += 2;
+            y += 4;
 
-            // H. ASESMEN
-            if (y > 310) { pdf.addPage(); y = margin.top; }
-            pdf.setFont('helvetica', 'bold');
-            pdf.text("H. ASESMEN", margin.left, y);
-            y += 6;
-            pdf.setFont('helvetica', 'normal');
+            // D. ASESMEN PEMBELAJARAN
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("D. ASESMEN PEMBELAJARAN", margin.left, y); y += 6;
+            pdf.text("Asesmen Awal Pembelajaran", margin.left, y); y += 6;
+            y = printMixedText(plan.asesmenAwal, margin.left + 5, y, contentWidth - 5, 6); y += 2;
             
-            pdf.text("Formatif:", margin.left + contentIndent, y);
-            y += 5;
-            const subContentIndent = contentIndent;
-            y = printMixedText(plan.asesmenFormatif, margin.left + subContentIndent, y, contentWidth - subContentIndent, 5, subContentIndent);
-            y += 3;
-
-            pdf.text("Sumatif:", margin.left + contentIndent, y);
-            y += 5;
-            y = printMixedText(plan.asesmenSumatif, margin.left + subContentIndent, y, contentWidth - subContentIndent, 5, subContentIndent);
-            y += 5;
-
-            // Signatures
-            if (y > 280) { pdf.addPage(); y = margin.top; }
-            y += 10;
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("Asesmen Proses Pembelajaran", margin.left, y); y += 6;
+            y = printMixedText(plan.asesmenFormatif, margin.left + 5, y, contentWidth - 5, 6); y += 2;
             
-            const formattedDate = new Date(signatureDate + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+            checkPageBreak(12);
+            pdf.setFont('helvetica', 'bold'); pdf.text("Asesmen Akhir Pembelajaran", margin.left, y); y += 6;
+            y = printMixedText(plan.asesmenSumatif, margin.left + 5, y, contentWidth - 5, 6);
+
+            // Signature with 1 blank line gap after the last assessment text
+            y += 12; // Adjusted distance for exactly one blank line gap (roughly 2*lineheight)
+            checkPageBreak(45);
+            const formattedDate = new Date(signatureDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
             const teacherX = pageWidth - margin.right - 60;
             const principalX = margin.left + 10;
 
-            if (signatureOption !== 'none') {
-                if (signatureOption === 'both') {
-                    pdf.text('Mengetahui,', principalX, y);
-                    pdf.text('Kepala Sekolah', principalX, y + 5);
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalX, y + 25);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalX, y + 30);
-                }
-                
-                if (['teacher', 'both'].includes(signatureOption)) {
-                    pdf.text(`${schoolIdentity.city || '.......'}, ${formattedDate}`, teacherX, y);
-                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 5);
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text(teacher.fullName, teacherX, y + 25);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${teacher.nip}`, teacherX, y + 30);
-                }
+            pdf.setFont('helvetica', 'normal'); pdf.setFontSize(11);
+            if (signatureOption === 'both' || signatureOption === 'teacher') {
+                pdf.text(`${schoolIdentity.city || '.......'}, ${formattedDate}`, teacherX, y, { align: 'center' });
+                pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 5, { align: 'center' });
+                pdf.setFont('helvetica', 'bold'); pdf.text(teacher.fullName, teacherX, y + 25, { align: 'center' });
+                pdf.setFont('helvetica', 'normal'); pdf.text(`NIP. ${teacher.nip}`, teacherX, y + 30, { align: 'center' });
+            }
+            if (signatureOption === 'both') {
+                pdf.text('Mengetahui,', principalX + 30, y, { align: 'center' });
+                pdf.text('Kepala Sekolah', principalX + 30, y + 5, { align: 'center' });
+                pdf.setFont('helvetica', 'bold'); pdf.text(schoolIdentity.principalName, principalX + 30, y + 25, { align: 'center' });
+                pdf.setFont('helvetica', 'normal'); pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalX + 30, y + 30, { align: 'center' });
             }
 
             pdf.save(`Perencanaan-Kokurikuler-${activity.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-            setNotification({ message: 'PDF berhasil dibuat.', type: 'success' });
+            setNotification({ message: 'PDF Perencanaan berhasil dibuat.', type: 'success' });
 
         } catch (error) {
             console.error(error);
@@ -1219,6 +1213,10 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
         } finally {
             setIsGeneratingPDF(false);
         }
+    };
+
+    const handleDownloadPDF = (signatureOption: 'none' | 'teacher' | 'both') => {
+        handleDownloadTab3PDF(signatureOption);
     };
 
     return (
@@ -1234,7 +1232,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                             disabled={isPulling}
                             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow flex items-center space-x-2 disabled:bg-purple-400 text-sm"
                         >
-                            {isPulling ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4" />}
+                            {isPulling ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <SparklesIcon className="w-4 h-4" />}
                             <span>Tarik dari Induk</span>
                         </button>
                     )}
@@ -1502,141 +1500,77 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                                 (() => {
                                     const activity = activities.find(a => a.id === activeActivityId);
                                     if (!activity) return <div>Kegiatan tidak ditemukan.</div>;
-                                    const plan = planningData[activeActivityId] || { activityId: activeActivityId, modelPembelajaran: '', metodePembelajaran: '', ruangFisik: '', budayaBelajar: '', kemitraan: '', digital: '', kegiatanMingguan: [], asesmenFormatif: '', asesmenSumatif: '' };
+                                    const plan = (planningData[activeActivityId] || { activityId: activeActivityId, modelPembelajaran: '', metodePembelajaran: '', ruangFisik: '', budayaBelajar: '', kemitraan: '', digital: '', kegiatanMingguan: [], asesmenAwal: '', asesmenFormatif: '', asesmenSumatif: '' }) as KokurikulerPlanning;
                                     
                                     const totalWeeks = Math.ceil((activity.activityJp || 0) / phaseInfo.jpPerWeek) || 1;
-                                    
-                                    // Ensure kegiatanMingguan array matches totalWeeks
-                                    const weeklyActivities = Array.from({ length: totalWeeks }, (_, i) => {
-                                        const existing = plan.kegiatanMingguan?.find(k => k.mingguKe === i + 1);
-                                        return existing || { mingguKe: i + 1, deskripsi: '' };
-                                    });
 
                                     return (
                                         <div className="space-y-6">
-                                            <div className="flex justify-between items-start border-b pb-4 sticky top-0 bg-white z-10 pt-2">
+                                            <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-lg border border-indigo-100">
                                                 <div>
-                                                    <h3 className="text-xl font-bold text-gray-800">{activity.name}</h3>
-                                                    <p className="text-sm text-gray-600 mt-1">Alokasi: {activity.activityJp} JP ({totalWeeks} Minggu) | Pelaksanaan: {activity.executionWeek}</p>
+                                                    <h4 className="font-bold text-indigo-800 uppercase">{activity.name}</h4>
+                                                    <p className="text-xs text-indigo-600 mt-1">{activity.executionWeek} | {activity.activityJp} JP</p>
                                                 </div>
-                                                <div className="flex space-x-2">
-                                                    <button onClick={handleGeneratePlanningAI} disabled={isGenerating} className="bg-purple-600 text-white px-3 py-1.5 rounded text-sm flex items-center hover:bg-purple-700 disabled:opacity-50">
-                                                        {isGenerating ? <svg className="animate-spin h-4 w-4 mr-1 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <SparklesIcon className="w-4 h-4 mr-1"/>} 
-                                                        Generate Perencanaan Lengkap (AI)
-                                                    </button>
+                                                <button onClick={handleGeneratePlanningAI} disabled={isGenerating} className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm font-bold shadow-md flex items-center gap-2">
+                                                    {isGenerating ? <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <SparklesIcon className="w-4 h-4"/>}
+                                                    {isGenerating ? 'Menyusun...' : 'Generate Lengkap (AI)'}
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <SectionInput label="Model Pembelajaran" value={plan.modelPembelajaran} onChange={v => handlePlanChange('modelPembelajaran', v)} placeholder="Misal: Project Based Learning (PjBL)"/>
+                                                <SectionInput label="Metode Pembelajaran" value={plan.metodePembelajaran} onChange={v => handlePlanChange('metodePembelajaran', v)} placeholder="Misal: Diskusi, Eksperimen, Pameran"/>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <SectionInput label="Ruang Fisik/Virtual" value={plan.ruangFisik} onChange={v => handlePlanChange('ruangFisik', v)} placeholder="Misal: Ruang kelas, kebun sekolah"/>
+                                                <SectionInput label="Budaya Belajar" value={plan.budayaBelajar} onChange={v => handlePlanChange('budayaBelajar', v)} placeholder="Misal: Kerja sama, saling menghormati"/>
+                                            </div>
+
+                                            <SectionInput label="Kemitraan Pembelajaran" value={plan.kemitraan} onChange={v => handlePlanChange('kemitraan', v)} placeholder="Siapa yang terlibat selain guru kelas?"/>
+                                            <SectionInput label="Pemanfaatan Digital" value={plan.digital} onChange={v => handlePlanChange('digital', v)} placeholder="Gadget/Aplikasi yang digunakan"/>
+
+                                            <div className="space-y-4">
+                                                <h5 className="font-bold text-gray-700 border-b pb-2">G. KEGIATAN MINGGUAN (DURASI: {totalWeeks} MINGGU)</h5>
+                                                {Array.from({ length: totalWeeks }).map((_, i) => (
+                                                    <div key={i} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                                        <label className="block text-sm font-bold text-indigo-700 mb-2">Minggu ke-{i + 1}</label>
+                                                        <textarea
+                                                            value={plan.kegiatanMingguan?.[i]?.deskripsi || ''}
+                                                            onChange={(e) => handleWeeklyActivityChange(i, e.target.value)}
+                                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-indigo-500 min-h-[120px] text-sm"
+                                                            placeholder="Langkah-langkah kegiatan... (Pisahkan per baris dengan \n)"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <SectionInput label="Asesmen Awal" value={plan.asesmenAwal} onChange={v => handlePlanChange('asesmenAwal', v)} placeholder="Penilaian awal..." height="h-32"/>
+                                                <SectionInput label="Asesmen Formatif" value={plan.asesmenFormatif} onChange={v => handlePlanChange('asesmenFormatif', v)} placeholder="Penilaian selama proses..." height="h-32"/>
+                                                <SectionInput label="Asesmen Sumatif" value={plan.asesmenSumatif} onChange={v => handlePlanChange('asesmenSumatif', v)} placeholder="Penilaian di akhir kegiatan..." height="h-32"/>
+                                            </div>
+
+                                            <div className="flex justify-between items-center pt-6 border-t">
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-xs text-gray-500">Tgl Cetak:</label>
+                                                    <input type="date" value={signatureDate} onChange={e => setSignatureDate(e.target.value)} className="p-1 border rounded text-xs" />
                                                     <div className="relative">
-                                                        <button 
-                                                            onClick={() => setIsPdfDropdownOpen(!isPdfDropdownOpen)} 
-                                                            disabled={isGeneratingPDF}
-                                                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold shadow flex items-center space-x-2 disabled:bg-gray-400"
-                                                        >
-                                                            <ArrowDownTrayIcon className="w-4 h-4 mr-1"/> <span>{isGeneratingPDF ? '...' : 'PDF'}</span>
+                                                        <button onClick={() => setIsPdfDropdownOpen(!isPdfDropdownOpen)} className="px-4 py-2 bg-gray-600 text-white rounded-md text-sm flex items-center gap-2 hover:bg-gray-700">
+                                                            <ArrowDownTrayIcon className="w-4 h-4"/> PDF
                                                         </button>
                                                         {isPdfDropdownOpen && (
-                                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
-                                                                <ul className="py-1">
-                                                                    <li><button onClick={() => handleDownloadTab3PDF('none')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Tanpa TTD</button></li>
-                                                                    <li><button onClick={() => handleDownloadTab3PDF('teacher')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">TTD Wali Kelas</button></li>
-                                                                    <li><button onClick={() => handleDownloadTab3PDF('both')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">TTD Wali Kelas & KS</button></li>
-                                                                </ul>
+                                                            <div className="absolute left-0 bottom-full mb-2 w-48 bg-white border rounded shadow-lg z-10" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
+                                                                <button onClick={() => handleDownloadTab3PDF('none')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Tanpa TTD</button>
+                                                                <button onClick={() => handleDownloadTab3PDF('teacher')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Wali Kelas</button>
+                                                                <button onClick={() => handleDownloadTab3PDF('both')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Wali Kelas & KS</button>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <button onClick={handleSavePlanning} disabled={isSaving} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm flex items-center hover:bg-green-700 disabled:opacity-50">
-                                                        {isSaving ? 'Saving...' : 'Simpan'}
-                                                    </button>
                                                 </div>
-                                            </div>
-
-                                            {/* A. Dimensi (Read Only) */}
-                                            <div className="bg-gray-50 p-4 rounded border">
-                                                <h4 className="font-bold text-gray-700 mb-2">A. Dimensi Profil Lulusan</h4>
-                                                <ul className="list-disc pl-5 text-sm text-gray-600">
-                                                    {activity.dimensions.map((d, i) => (
-                                                        <li key={i}><strong>{d.name}</strong>: {d.elements.join(', ')}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-
-                                            {/* B. Tujuan (Read Only) */}
-                                            <div className="bg-gray-50 p-4 rounded border">
-                                                <h4 className="font-bold text-gray-700 mb-2">B. Tujuan Kegiatan</h4>
-                                                <p className="text-sm text-gray-600">{activity.goal}</p>
-                                            </div>
-
-                                            {/* C. Praktik Pedagogis */}
-                                            <div className="border p-4 rounded">
-                                                <h4 className="font-bold text-gray-700 mb-3">C. Praktik Pedagogis</h4>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-1">Model Pembelajaran</label>
-                                                        <input type="text" className="w-full p-2 border rounded text-sm" value={plan.modelPembelajaran || ''} onChange={e => handlePlanChange('modelPembelajaran', e.target.value)} placeholder="Contoh: Project Based Learning" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-1">Metode Pembelajaran</label>
-                                                        <input type="text" className="w-full p-2 border rounded text-sm" value={plan.metodePembelajaran || ''} onChange={e => handlePlanChange('metodePembelajaran', e.target.value)} placeholder="Contoh: Diskusi, Observasi" />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* D. Lingkungan Belajar */}
-                                            <div className="border p-4 rounded">
-                                                <h4 className="font-bold text-gray-700 mb-3">D. Lingkungan Belajar</h4>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-1">Ruang Fisik / Virtual</label>
-                                                        <textarea className="w-full p-2 border rounded text-sm" rows={2} value={plan.ruangFisik || ''} onChange={e => handlePlanChange('ruangFisik', e.target.value)} placeholder="Contoh: Halaman sekolah, Kelas..." />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-1">Budaya Belajar</label>
-                                                        <textarea className="w-full p-2 border rounded text-sm" rows={2} value={plan.budayaBelajar || ''} onChange={e => handlePlanChange('budayaBelajar', e.target.value)} placeholder="Contoh: Saling menghargai, kolaboratif..." />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* E. Kemitraan */}
-                                            <div className="border p-4 rounded">
-                                                <h4 className="font-bold text-gray-700 mb-3">E. Kemitraan Pembelajaran</h4>
-                                                <textarea className="w-full p-2 border rounded text-sm" rows={2} value={plan.kemitraan || ''} onChange={e => handlePlanChange('kemitraan', e.target.value)} placeholder="Pihak yang terlibat: Guru Kelas, Wali Murid, Narasumber..." />
-                                            </div>
-
-                                            {/* F. Digital */}
-                                            <div className="border p-4 rounded">
-                                                <h4 className="font-bold text-gray-700 mb-3">F. Pemanfaatan Digital</h4>
-                                                <textarea className="w-full p-2 border rounded text-sm" rows={2} value={plan.digital || ''} onChange={e => handlePlanChange('digital', e.target.value)} placeholder="Teknologi yang digunakan: Kamera HP, Youtube, Canva..." />
-                                            </div>
-
-                                            {/* G. Kegiatan Mingguan */}
-                                            <div className="border p-4 rounded bg-blue-50">
-                                                <h4 className="font-bold text-gray-700 mb-3">G. Rincian Kegiatan Mingguan</h4>
-                                                <div className="space-y-4">
-                                                    {weeklyActivities.map((week, idx) => (
-                                                        <div key={idx}>
-                                                            <label className="block text-sm font-bold mb-1 text-indigo-700">Minggu ke-{week.mingguKe}</label>
-                                                            <textarea 
-                                                                className="w-full p-2 border rounded text-sm font-mono h-24"
-                                                                value={week.deskripsi || ''}
-                                                                onChange={e => handleWeeklyActivityChange(idx, e.target.value)}
-                                                                placeholder="1. Langkah awal...&#10;2. Langkah selanjutnya..."
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* H. Asesmen */}
-                                            <div className="border p-4 rounded">
-                                                <h4 className="font-bold text-gray-700 mb-3">H. Asesmen</h4>
-                                                <div className="grid grid-cols-1 gap-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-1">Asesmen Formatif (Proses)</label>
-                                                        <textarea className="w-full p-2 border rounded text-sm" rows={3} value={plan.asesmenFormatif || ''} onChange={e => handlePlanChange('asesmenFormatif', e.target.value)} placeholder="Teknik penilaian selama proses..." />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-1">Asesmen Sumatif (Akhir)</label>
-                                                        <textarea className="w-full p-2 border rounded text-sm" rows={3} value={plan.asesmenSumatif || ''} onChange={e => handlePlanChange('asesmenSumatif', e.target.value)} placeholder="Teknik penilaian hasil akhir..." />
-                                                    </div>
-                                                </div>
+                                                <button onClick={handleSavePlanning} disabled={isSaving} className="px-8 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-bold shadow-lg disabled:bg-indigo-400">
+                                                    {isSaving ? 'Menyimpan...' : 'Simpan Perencanaan'}
+                                                </button>
                                             </div>
                                         </div>
                                     );
@@ -1647,7 +1581,180 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                 )}
             </div>
 
-            {/* Modal Konfirmasi Tarik Kokurikuler */}
+            {/* THEME MODAL */}
+            {isThemeModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+                        <form onSubmit={handleSaveTheme}>
+                            <div className="bg-indigo-600 px-6 py-4">
+                                <h3 className="text-xl font-bold text-white">{currentTheme ? 'Edit Tema' : 'Tambah Tema Baru'}</h3>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nama Tema</label>
+                                    <input type="text" value={themeForm.name} onChange={e => setThemeForm({...themeForm, name: e.target.value})} required className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                    <select value={themeForm.status} onChange={e => setThemeForm({...themeForm, status: e.target.value as any})} className="w-full p-2 border border-gray-300 rounded">
+                                        <option value="aktif">Aktif (Tampil di Program)</option>
+                                        <option value="tidak aktif">Tidak Aktif</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi Singkat</label>
+                                    <textarea value={themeForm.description} onChange={e => setThemeForm({...themeForm, description: e.target.value})} className="w-full p-2 border border-gray-300 rounded h-24" placeholder="Jelaskan fokus projek pada tema ini..." />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Total JP Semester</label>
+                                    <input type="number" value={themeForm.totalJp} onChange={e => setThemeForm({...themeForm, totalJp: parseInt(e.target.value)||0})} className="w-full p-2 border border-gray-300 rounded" />
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-2">
+                                <button type="button" onClick={() => setIsThemeModalOpen(false)} className="px-4 py-2 text-gray-700 font-medium">Batal</button>
+                                <button type="submit" disabled={isSaving} className="px-6 py-2 bg-indigo-600 text-white rounded font-bold shadow hover:bg-indigo-700 disabled:bg-indigo-400">
+                                    {isSaving ? 'Menyimpan...' : 'Simpan'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ACTIVITY MODAL */}
+            {isActivityModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 overflow-y-auto">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 overflow-hidden">
+                        <form onSubmit={handleSaveActivity}>
+                            <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center">
+                                <h3 className="text-xl font-bold text-white">{currentActivity ? 'Edit Kegiatan' : 'Tambah Kegiatan'}</h3>
+                                <button type="button" onClick={() => setIsActivityModalOpen(false)} className="text-white hover:text-indigo-200"><XCircleIcon className="w-8 h-8"/></button>
+                            </div>
+                            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto">
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Nama Kegiatan</label>
+                                        <input type="text" value={activityForm.name} onChange={e => setActivityForm({...activityForm, name: e.target.value})} required className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition-colors" placeholder="Misal: Budidaya Sayur Organik" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Tujuan Akhir Kegiatan</label>
+                                        <textarea value={activityForm.goal} onChange={e => setActivityForm({...activityForm, goal: e.target.value})} required className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none h-32 transition-colors" placeholder="Apa yang ingin dicapai siswa melalui kegiatan ini?" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Alokasi (JP)</label>
+                                            <input type="number" value={activityForm.activityJp} onChange={e => setActivityForm({...activityForm, activityJp: parseInt(e.target.value)||0})} className="w-full p-2 border-2 border-gray-200 rounded-md focus:border-indigo-500 focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Minggu Pelaksanaan</label>
+                                            <input type="text" value={activityForm.executionWeek} onChange={e => setActivityForm({...activityForm, executionWeek: e.target.value})} className="w-full p-2 border-2 border-gray-200 rounded-md focus:border-indigo-500 focus:outline-none" placeholder="Minggu ke-1 s.d. 4" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Mata Pelajaran Terkait</label>
+                                        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border-2 border-gray-100 rounded-lg bg-gray-50">
+                                            {subjects.map(s => (
+                                                <label key={s.id} className="flex items-center space-x-2 text-xs cursor-pointer hover:bg-white p-1 rounded transition-colors">
+                                                    <input type="checkbox" checked={activityForm.relatedSubjects.includes(s.name)} onChange={() => handleSubjectToggle(s.name)} className="rounded text-indigo-600" />
+                                                    <span className="truncate" title={s.name}>{s.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                                        <label className="block text-sm font-bold text-indigo-800 mb-3 uppercase tracking-wide">Dimensi Profil Lulusan</label>
+                                        <div className="space-y-3">
+                                            <select value={selectedDimKey} onChange={e => {setSelectedDimKey(e.target.value); setSelectedSubElements([]);}} className="w-full p-2 border border-indigo-200 rounded-md bg-white text-sm">
+                                                <option value="">-- Pilih Dimensi --</option>
+                                                {DIMENSION_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                            {selectedDimKey && (
+                                                <div className="space-y-2 animate-fade-in">
+                                                    <label className="block text-xs font-bold text-indigo-600 uppercase">Sub-elemen:</label>
+                                                    <div className="grid grid-cols-1 gap-1">
+                                                        {DIMENSIONS_DATA[selectedDimKey].map(sub => (
+                                                            <label key={sub} className="flex items-center space-x-2 text-xs p-1 hover:bg-indigo-100 rounded cursor-pointer">
+                                                                <input type="checkbox" checked={selectedSubElements.includes(sub)} onChange={e => {
+                                                                    if(e.target.checked) setSelectedSubElements([...selectedSubElements, sub]);
+                                                                    else setSelectedSubElements(selectedSubElements.filter(s => s !== sub));
+                                                                }} className="rounded text-indigo-600" />
+                                                                <span>{sub}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                    <button type="button" onClick={handleAddDimensionToForm} disabled={selectedSubElements.length === 0} className="w-full py-2 bg-indigo-600 text-white rounded-md text-xs font-bold hover:bg-indigo-700 disabled:bg-indigo-300">
+                                                        Tambahkan ke Daftar
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase">Daftar Dimensi Terpilih:</label>
+                                        {activityForm.dimensions.length === 0 ? <p className="text-xs text-gray-400 italic">Minimal pilih 2 dimensi.</p> : 
+                                            activityForm.dimensions.map((d, i) => (
+                                                <div key={i} className="flex justify-between items-start p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                                                    <div className="pr-4">
+                                                        <p className="text-xs font-bold text-indigo-700">{d.name}</p>
+                                                        <p className="text-[10px] text-gray-500 mt-1 italic">{d.elements.join(', ')}</p>
+                                                    </div>
+                                                    <button type="button" onClick={() => handleRemoveDimensionFromForm(d.name)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-4 h-4"/></button>
+                                                </div>
+                                            ))
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-8 py-6 flex justify-end items-center gap-4">
+                                <p className="text-xs text-gray-400 italic mr-auto">* Pastikan data diisi lengkap untuk hasil maksimal.</p>
+                                <button type="button" onClick={() => setIsActivityModalOpen(false)} className="px-6 py-2 text-gray-700 font-medium hover:text-indigo-600 transition-colors">Batal</button>
+                                <button type="submit" disabled={isSaving} className="px-10 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all disabled:bg-indigo-400 transform active:scale-95">
+                                    {isSaving ? 'Menyimpan...' : 'Simpan Kegiatan'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* DELETE THEME CONFIRMATION */}
+            {themeToDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Tema?</h3>
+                        <p className="text-gray-600 text-sm mb-6">
+                            Anda akan menghapus tema <strong>"{themeToDelete.name}"</strong>. 
+                            Seluruh kegiatan di bawah tema ini juga akan terhapus.
+                        </p>
+                        <div className="flex gap-2">
+                            <button onClick={confirmDeleteTheme} disabled={isSaving} className="flex-1 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700 shadow disabled:bg-red-300">YA, HAPUS</button>
+                            <button onClick={() => setThemeToDelete(null)} disabled={isSaving} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded font-bold">BATAL</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* DELETE ACTIVITY CONFIRMATION */}
+            {activityToDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Kegiatan?</h3>
+                        <p className="text-gray-600 text-sm mb-6">
+                            Anda akan menghapus kegiatan <strong>"{activityToDelete.name}"</strong> secara permanen.
+                        </p>
+                        <div className="flex gap-2">
+                            <button onClick={confirmDeleteActivity} disabled={isSaving} className="flex-1 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700 shadow disabled:bg-red-300">YA, HAPUS</button>
+                            <button onClick={() => setActivityToDelete(null)} disabled={isSaving} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded font-bold">BATAL</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SYNC MODAL */}
             {isPullModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-fade-in scale-100">
@@ -1655,11 +1762,11 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                             <div className="flex items-center justify-center w-16 h-16 mx-auto bg-purple-100 rounded-full mb-4">
                                 <SparklesIcon className="w-10 h-10 text-purple-600" />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Tarik Program Kokurikuler?</h3>
+                            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Tarik Data Kokurikuler?</h3>
                             <p className="text-gray-600 text-center text-sm mb-6">
-                                Anda akan menyalin data Program Kokurikuler dari Admin untuk Semester <span className="font-bold">{selectedSemester}</span>. 
+                                Anda akan menyalin seluruh tema, daftar kegiatan, dan perencanaan dari Admin untuk Semester ini. 
                                 <br/><br/>
-                                <span className="text-red-600 font-bold">Peringatan:</span> Seluruh tema, kegiatan, dan perencanaan yang sudah Anda buat atau ubah sendiri untuk semester ini akan <span className="underline">ditimpa sepenuhnya</span>.
+                                <span className="text-red-600 font-bold">Peringatan:</span> Data yang Anda susun sendiri saat ini akan <span className="underline">ditimpa sepenuhnya</span>.
                             </p>
                             <div className="flex flex-col gap-2">
                                 <button 
@@ -1683,214 +1790,28 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                 </div>
             )}
 
-            {/* --- MODAL FOR THEME --- */}
-            {isThemeModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsThemeModalOpen(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="p-6">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">{currentTheme ? 'Edit Tema' : 'Tambah Tema'}</h3>
-                            <form onSubmit={handleSaveTheme}>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Nama Tema</label>
-                                        <input type="text" className="w-full p-2 border rounded mt-1" value={themeForm.name} onChange={e => setThemeForm({...themeForm, name: e.target.value})} required />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Status</label>
-                                        <select 
-                                            value={themeForm.status} 
-                                            onChange={e => setThemeForm({...themeForm, status: e.target.value as any})}
-                                            className="w-full p-2 border rounded mt-1"
-                                        >
-                                            <option value="aktif">Aktif</option>
-                                            <option value="tidak aktif">Tidak Aktif</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <div className="flex-1">
-                                            <label className="block text-sm font-medium text-gray-700">Alokasi JP</label>
-                                            <input type="number" className="w-full p-2 border rounded mt-1" value={themeForm.totalJp} onChange={e => setThemeForm({...themeForm, totalJp: parseInt(e.target.value) || 0})} required min="0" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Deskripsi</label>
-                                        <textarea className="w-full p-2 border rounded mt-1 h-24" value={themeForm.description} onChange={e => setThemeForm({...themeForm, description: e.target.value})} />
-                                    </div>
-                                </div>
-                                <div className="mt-6 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setIsThemeModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded">Batal</button>
-                                    <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded">Simpan</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- MODAL FOR DELETE THEME --- */}
-            {themeToDelete && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setThemeToDelete(null)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold mb-2">Hapus Tema?</h3>
-                        <p className="text-sm text-gray-500 mb-6">"{themeToDelete.name}" akan dihapus permanen beserta kegiatannya.</p>
-                        <div className="flex justify-center gap-2">
-                            <button onClick={() => setThemeToDelete(null)} className="px-4 py-2 bg-gray-100 rounded">Batal</button>
-                            <button onClick={confirmDeleteTheme} className="px-4 py-2 bg-red-600 text-white rounded">Hapus</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- MODAL FOR DELETE ACTIVITY --- */}
-            {activityToDelete && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setActivityToDelete(null)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold mb-2">Hapus Kegiatan?</h3>
-                        <p className="text-sm text-gray-500 mb-6">Kegiatan "{activityToDelete.name}" akan dihapus permanen.</p>
-                        <div className="flex justify-center gap-2">
-                            <button type="button" onClick={() => setActivityToDelete(null)} className="px-4 py-2 bg-gray-100 rounded">Batal</button>
-                            <button type="button" onClick={confirmDeleteActivity} className="px-4 py-2 bg-red-600 text-white rounded">Hapus</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- MODAL FOR ACTIVITY --- */}
-            {isActivityModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsActivityModalOpen(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <div className="p-6">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">{currentActivity ? 'Edit Kegiatan' : 'Tambah Kegiatan'}</h3>
-                            <form onSubmit={handleSaveActivity} className="space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Nama Kegiatan</label>
-                                    <input type="text" required className="mt-1 w-full p-2 border rounded" value={activityForm.name} onChange={e => setActivityForm({...activityForm, name: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Tujuan Akhir Kegiatan</label>
-                                    <textarea required className="mt-1 w-full p-2 border rounded" value={activityForm.goal} onChange={e => setActivityForm({...activityForm, goal: e.target.value})} />
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Alokasi Waktu (JP)</label>
-                                        <input 
-                                            type="number" 
-                                            required 
-                                            className="mt-1 w-full p-2 border rounded" 
-                                            value={activityForm.activityJp} 
-                                            onChange={e => setActivityForm({...activityForm, activityJp: parseInt(e.target.value) || 0})}
-                                            min="0"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Kelipatan yang disarankan: {phaseInfo.jpPerWeek} JP.
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Pelaksanaan</label>
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            placeholder="Contoh: Minggu ke-1 s.d. Minggu ke-2"
-                                            className="mt-1 w-full p-2 border rounded" 
-                                            value={activityForm.executionWeek} 
-                                            onChange={e => setActivityForm({...activityForm, executionWeek: e.target.value})} 
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Isi dengan keterangan minggu efektif.</p>
-                                    </div>
-                                </div>
-
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="text-sm font-bold text-gray-800 mb-2">Pilih Profil Lulusan (Minimal 2 Dimensi)</h4>
-                                    
-                                    <div className="flex gap-2 mb-2">
-                                        <select 
-                                            className="flex-1 p-2 border rounded text-sm"
-                                            value={selectedDimKey}
-                                            onChange={e => { setSelectedDimKey(e.target.value); setSelectedSubElements([]); }}
-                                        >
-                                            <option value="">-- Pilih Dimensi --</option>
-                                            {DIMENSION_KEYS.map(key => <option key={key} value={key}>{key}</option>)}
-                                        </select>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleAddDimensionToForm}
-                                            disabled={!selectedDimKey || selectedSubElements.length === 0}
-                                            className="px-3 py-2 bg-indigo-600 text-white rounded text-sm disabled:bg-gray-300"
-                                        >
-                                            + Tambah
-                                        </button>
-                                    </div>
-
-                                    {selectedDimKey && (
-                                        <div className="mb-4 pl-2">
-                                            <p className="text-xs text-gray-500 mb-1">Pilih Sub-elemen:</p>
-                                            <div className="grid grid-cols-1 gap-1">
-                                                {DIMENSIONS_DATA[selectedDimKey]?.map(element => (
-                                                    <label key={element} className="flex items-center text-sm">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="mr-2"
-                                                            checked={selectedSubElements.includes(element)}
-                                                            onChange={e => {
-                                                                if (e.target.checked) setSelectedSubElements([...selectedSubElements, element]);
-                                                                else setSelectedSubElements(selectedSubElements.filter(el => el !== element));
-                                                            }}
-                                                        />
-                                                        {element}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-2 mt-4">
-                                        {activityForm.dimensions.map((dim, idx) => (
-                                            <div key={idx} className="bg-white p-2 border rounded text-sm flex justify-between items-start">
-                                                <div>
-                                                    <div className="font-bold text-indigo-700">{dim.name}</div>
-                                                    <ul className="list-disc pl-4 text-gray-600 text-xs">
-                                                        {dim.elements.map((el, i) => <li key={i}>{el}</li>)}
-                                                    </ul>
-                                                </div>
-                                                <button type="button" onClick={() => handleRemoveDimensionFromForm(dim.name)} className="text-red-500 hover:text-red-700">
-                                                    <XCircleIcon className="w-5 h-5"/>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {activityForm.dimensions.length < 2 && <p className="text-xs text-red-500 mt-1">* Harap tambahkan minimal 2 dimensi.</p>}
-                                </div>
-
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="text-sm font-bold text-gray-800 mb-2">Mata Pelajaran Terkait (Pilih Minimal 1)</h4>
-                                    <div className="grid grid-cols-2 gap-2 text-sm max-h-40 overflow-y-auto">
-                                        {subjects.map(subject => (
-                                            <label key={subject.id} className="flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    className="mr-2"
-                                                    checked={activityForm.relatedSubjects.includes(subject.name)}
-                                                    onChange={() => handleSubjectToggle(subject.name)}
-                                                />
-                                                {subject.name}
-                                            </label>
-                                        ))}
-                                    </div>
-                                    {activityForm.relatedSubjects.length === 0 && <p className="text-xs text-red-500 mt-1">* Harap pilih minimal 1 mata pelajaran.</p>}
-                                </div>
-
-                                <div className="flex justify-end gap-2">
-                                    <button type="button" onClick={() => setIsActivityModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded">Batal</button>
-                                    <button type="submit" disabled={isSaving || activityForm.dimensions.length < 2} className="px-4 py-2 bg-indigo-600 text-white rounded disabled:bg-indigo-300">Simpan</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+             <style>{`
+                .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background-color: #4f46e5; color: white; border-radius: 0.5rem; font-weight: 600; transition: all 0.2s; }
+                .btn-secondary { padding: 0.5rem 1rem; background-color: #e5e7eb; color: #1f2937; border-radius: 0.5rem; font-weight: 600; }
+                .btn-primary:hover { background-color: #4338ca; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+                .btn-primary:active { transform: translateY(0); }
+                .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+                @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+                .animate-fade-in { animation: fade-in 0.3s ease-out; }
+            `}</style>
         </div>
     );
 };
+
+const SectionInput: React.FC<{ label: string, value: string, onChange: (v: string) => void, placeholder: string, height?: string }> = ({ label, value, onChange, placeholder, height = 'h-10' }) => (
+    <div>
+        <label className="block text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">{label}</label>
+        {height === 'h-10' ? (
+            <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder={placeholder} />
+        ) : (
+            <textarea value={value} onChange={e => onChange(e.target.value)} className={`w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm ${height}`} placeholder={placeholder} />
+        )}
+    </div>
+);
 
 export default ProgramKokurikuler;

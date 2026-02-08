@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Teacher, SchoolIdentity, ModulAjarData, ModulAjar, ProsemData, ProsemRow } from '../types';
 import { getModulAjar, updateModulAjar, getTeacherProfile, getSchoolIdentity, getSubjects, getProsem, pullModulAjarToTeacher } from '../services/adminService';
@@ -243,7 +242,6 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
         try {
             const atpList = Array.from(new Set(topicData.subTopics.map(s => s.atp))).join('\n');
             
-            // LOGIKA PEMETAAN MATERI PER TANGGAL (SINKRONISASI MUTLAK DENGAN PROSEM)
             const meetingDetails: string[] = [];
             const materialUsageCount = new Map<string, number>();
 
@@ -271,7 +269,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                 ${meetingDetails.join('\n')}
 
                 INSTRUKSI FORMAT (SANGAT KETAT):
-                1. Judul Pertemuan format: "PERTEMUAN [X] : [Materi]". (JANGAN masukkan jumlah JP ke judul pertemuan).
+                1. Judul Pertemuan format: "PERTEMUAN [X] : [Materi]".
                 2. Struktur kegiatan di setiap pertemuan:
                    1. Pendahuluan:
                       a. [Butir 1]
@@ -282,8 +280,9 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                    3. Penutup:
                       a. [Butir 1]
                       b. [Butir 2]
-                3. Bagian IDENTIFIKASI: Pilih minimal 3 dimensi profil lulusan dari: ${PROFIL_LULUSAN_OPTIONS.join(', ')}.
-                4. Bagian ASESMEN: Tulis poin-poin instrumen yang dipisahkan dengan \\n.
+                3. **WAJIB & KRITIKAL**: Gunakan karakter newline (\\n) secara eksplisit di SETIAP akhir baris teks. Pastikan judul pertemuan, sub-judul (Pendahuluan, Inti, Penutup), dan setiap butir kegiatan (a, b, c) berada di baris baru masing-masing. JANGAN biarkan teks menjadi satu blok paragraf panjang.
+                4. Bagian IDENTIFIKASI: Pilih minimal 3 dimensi profil lulusan dari: ${PROFIL_LULUSAN_OPTIONS.join(', ')}.
+                5. Bagian ASESMEN: Tulis poin-poin instrumen yang dipisahkan dengan \\n di setiap akhir butir soal/instrumen.
 
                 Output JSON:
                 {
@@ -294,10 +293,10 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                   "lingkunganFisik": "...",
                   "lingkunganBudaya": "...",
                   "digital": "...",
-                  "pengalaman": "[Teks rincian TEPAT ${totalMeetings} pertemuan sesuai daftar di atas...]",
-                  "asesmenAwal": "1. [Poin...]\\n2. [Poin...]",
-                  "asesmenFormatif": "1. [Poin...]\\n2. [Poin...]",
-                  "asesmenSumatif": "1. [Poin...]\\n2. [Poin...]"
+                  "pengalaman": "PERTEMUAN 1: [Materi]\\n1. Pendahuluan:\\na. [Kegiatan...]\\nb. [Kegiatan...]\\n2. Inti:\\na. [Kegiatan...]\\nb. [Kegiatan...]\\n3. Penutup:\\na. [Kegiatan...]\\n\\nPERTEMUAN 2: ...",
+                  "asesmenAwal": "1. [Pertanyaan...]\\n2. [Pertanyaan...]",
+                  "asesmenFormatif": "1. [Instrumen...]\\n2. [Instrumen...]",
+                  "asesmenSumatif": "1. [Soal...]\\n2. [Soal...]"
                 }
             `;
 
@@ -316,10 +315,13 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                             lingkunganFisik: { type: Type.STRING },
                             lingkunganBudaya: { type: Type.STRING },
                             digital: { type: Type.STRING },
-                            pengalaman: { type: Type.STRING },
-                            asesmenAwal: { type: Type.STRING },
-                            asesmenFormatif: { type: Type.STRING }, 
-                            asesmenSumatif: { type: Type.STRING },  
+                            pengalaman: { 
+                                type: Type.STRING, 
+                                description: "Rincian langkah pembelajaran setiap pertemuan yang WAJIB dipisahkan dengan baris baru (\\n) untuk setiap judul, sub-judul, dan poin kegiatan guna menjaga struktur dokumen." 
+                            },
+                            asesmenAwal: { type: Type.STRING, description: "Poin-poin asesmen awal yang dipisahkan dengan \\n." },
+                            asesmenFormatif: { type: Type.STRING, description: "Poin-poin asesmen proses yang dipisahkan dengan \\n." }, 
+                            asesmenSumatif: { type: Type.STRING, description: "Poin-poin asesmen akhir yang dipisahkan dengan \\n." },  
                         },
                         required: ["identifikasi", "modelPembelajaran", "metodePembelajaran", "kemitraan", "lingkunganFisik", "lingkunganBudaya", "digital", "pengalaman", "asesmenAwal", "asesmenFormatif", "asesmenSumatif"]
                     }
@@ -363,11 +365,14 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             const contentWidth = pageWidth - margin.left - margin.right;
             let y = margin.top;
 
+            // Robust Page Break Helper
             const checkPageBreak = (neededHeight: number) => {
-                if (y + neededHeight > 315) {
+                if (y + neededHeight > 310) {
                     pdf.addPage();
                     y = margin.top + 10;
+                    return true;
                 }
+                return false;
             };
 
             const addTitle = (text: string) => {
@@ -378,7 +383,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             };
 
             const addSectionHeader = (text: string) => {
-                checkPageBreak(10);
+                checkPageBreak(12);
                 pdf.setFont('helvetica', 'bold');
                 pdf.setFontSize(11); 
                 pdf.text(text, margin.left, y);
@@ -453,7 +458,10 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
 
                     const wrappedLines = pdf.splitTextToSize(cleanLine, currentMaxWidth);
                     wrappedLines.forEach((wl: string, idx: number) => {
-                        checkPageBreak(lineHeight);
+                        if (cursorY + lineHeight > 315) {
+                            pdf.addPage();
+                            cursorY = margin.top + 10;
+                        }
                         pdf.setFont('helvetica', 'normal');
                         pdf.setFontSize(11);
                         const printX = (idx > 0) ? currentX + hangingIndent : currentX;
@@ -472,8 +480,8 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             addLabelValue("Mata Pelajaran", selectedSubjectName);
             addLabelValue("Materi/Tema", topicData.topic);
             addLabelValue("Kelas/Fase/Semester", `${selectedClass.replace('Kelas ', '')} / ${phase} / ${selectedSemester}`);
-            addLabelValue("Alokasi Waktu", `${topicData.totalJp} JP (${topicData.meetingDates.length} Kali Pertemuan)`);
-            addLabelValue("Tahun Pelajaran", selectedYear);
+            addLabelValue("Tahun Pelajaran", selectedYear); // Positioned above Alokasi Waktu
+            addLabelValue("Alokasi Waktu", `${topicData.totalJp} JP (${topicData.meetingDates.length} Kali Pertemuan)`); // Now at the bottom
             y += 5;
 
             addSectionHeader("A. IDENTIFIKASI PEMBELAJARAN");
@@ -500,11 +508,11 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             y += 2; pdf.setFont('helvetica', 'bold'); pdf.text("Praktik Pedagogis", margin.left, y); y += 6;
             addSubField("Model", data.modelPembelajaran); addSubField("Metode", data.metodePembelajaran);
             y += 2; pdf.setFont('helvetica', 'bold'); pdf.text("Kemitraan Pembelajaran", margin.left, y); y += 6;
-            pdf.setFont('helvetica', 'normal'); y = printMixedText(data.kemitraan || "-", margin.left, y, contentWidth, 6);
+            y = printMixedText(data.kemitraan || "-", margin.left, y, contentWidth, 6);
             y += 2; pdf.setFont('helvetica', 'bold'); pdf.text("Lingkungan Pembelajaran", margin.left, y); y += 6;
             addSubField("Ruang Fisik/Virtual", data.lingkunganFisik); addSubField("Budaya Belajar", data.lingkunganBudaya);
             y += 2; pdf.setFont('helvetica', 'bold'); pdf.text("Pemanfaatan Digital", margin.left, y); y += 6;
-            pdf.setFont('helvetica', 'normal'); y = printMixedText(data.digital || "-", margin.left, y, contentWidth, 6);
+            y = printMixedText(data.digital || "-", margin.left, y, contentWidth, 6);
             y += 6;
 
             addSectionHeader("C. PENGALAMAN BELAJAR");
@@ -519,10 +527,11 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                     const isHeader = isMeetingHeader || upperPlainText.startsWith('PENDAHULUAN') || upperPlainText.startsWith('INTI') || upperPlainText.startsWith('PENUTUP');
                     if (isHeader) {
                         if (isMeetingHeader) { if (!firstMeeting) { y += 6; } firstMeeting = false; }
-                        checkPageBreak(8); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11);
+                        checkPageBreak(10); 
+                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11);
                         pdf.text(cleanLine.replace(/\*\*/g, ''), margin.left, y); y += 6;
                     } else {
-                        checkPageBreak(6); y = printMixedText(line, margin.left, y, contentWidth, 6);
+                        y = printMixedText(line, margin.left, y, contentWidth, 6);
                     }
                 });
             };
@@ -530,27 +539,34 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             y += 5;
 
             addSectionHeader("D. ASESMEN PEMBELAJARAN");
+            
+            checkPageBreak(10);
             pdf.setFont('helvetica', 'bold'); pdf.text("Asesmen Awal Pembelajaran", margin.left, y); y += 6;
             y = printMixedText(data.asesmenAwal, margin.left, y, contentWidth, 6); y += 2;
+            
+            checkPageBreak(10);
             pdf.setFont('helvetica', 'bold'); pdf.text("Asesmen Proses Pembelajaran", margin.left, y); y += 6;
             y = printMixedText(data.asesmenFormatif, margin.left, y, contentWidth, 6); y += 2;
+            
+            checkPageBreak(10);
             pdf.setFont('helvetica', 'bold'); pdf.text("Asesmen Akhir Pembelajaran", margin.left, y); y += 6;
             y = printMixedText(data.asesmenSumatif, margin.left, y, contentWidth, 6);
 
-            y += 6; 
-            const signatureBlockHeight = 40;
-            if (y + signatureBlockHeight > 315) { pdf.addPage(); y = margin.top + 10; }
+            // FINAL SIGNATURE SECTION
+            y += 10; 
+            const signatureBlockHeight = 45;
+            if (y + signatureBlockHeight > 320) { 
+                pdf.addPage(); 
+                y = margin.top + 15; 
+            }
             
-            // LOGIKA OTOMATISASI TANGGAL TANDA TANGAN
             let finalIndoDate: string;
             if (topicData.meetingDates && topicData.meetingDates.length > 0) {
-                // Ambil tanggal pertama dari Prosem
                 const firstDateFromProsem = topicData.meetingDates[0];
                 const [d, m, yParts] = firstDateFromProsem.split('-').map(Number);
                 const dateObj = new Date(yParts, m - 1, d);
                 finalIndoDate = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
             } else {
-                // Fallback ke input manual jika tidak ada tanggal di Prosem
                 finalIndoDate = new Date(signatureDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
             }
 
@@ -571,7 +587,12 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
 
             pdf.save(`ModulAjar-${topicData.topic.replace(/[\s/]/g, '_')}.pdf`);
             setNotification({ message: 'PDF berhasil dibuat.', type: 'success' });
-        } catch (error) { setNotification({ message: 'Gagal membuat PDF.', type: 'error' }); } finally { setIsGeneratingPDF(false); }
+        } catch (error) { 
+            console.error("PDF Error:", error);
+            setNotification({ message: 'Gagal membuat PDF.', type: 'error' }); 
+        } finally { 
+            setIsGeneratingPDF(false); 
+        }
     };
 
     if (isLoading) return <div className="text-center p-8">Memuat data...</div>;
@@ -658,7 +679,9 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                                         <div className="grid grid-cols-1 gap-4">
                                             <Field label="Tujuan Pembelajaran (dari ATP)" value={modulAjarData[topicId]?.tujuanPembelajaran} onChange={v => handleFormChange(topicId, 'tujuanPembelajaran', v)} />
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* COMMENT: Fixed missing name 'handlePlanChange' by using 'handleFormChange' */}
                                                 <Field label="Model Pembelajaran" value={modulAjarData[topicId]?.modelPembelajaran} onChange={v => handleFormChange(topicId, 'modelPembelajaran', v)} />
+                                                {/* COMMENT: Fixed missing name 'handlePlanChange' by using 'handleFormChange' */}
                                                 <Field label="Metode Pembelajaran" value={modulAjarData[topicId]?.metodePembelajaran} onChange={v => handleFormChange(topicId, 'metodePembelajaran', v)} />
                                             </div>
                                             <Field label="Kemitraan Pembelajaran" value={modulAjarData[topicId]?.kemitraan} onChange={v => handleFormChange(topicId, 'kemitraan', v)} />
