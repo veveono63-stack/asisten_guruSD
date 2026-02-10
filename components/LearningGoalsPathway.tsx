@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
-import { Subject, ATPRow, ATPData, LearningOutcomeItem, LearningOutcomeElement, LearningObjectiveItem } from '../types';
+import { Subject, ATPRow, ATPData, LearningOutcomeItem, LearningOutcomeElement, LearningObjectiveItem, SchoolIdentity, Teacher } from '../types';
 import { getSubjects, getATPData, updateATPData, getLearningObjectives, getTeacherProfile, getSchoolIdentity, pullATPDataToTeacher } from '../services/adminService';
 import Notification, { NotificationType } from './Notification';
 import { SparklesIcon, ArrowDownTrayIcon, PencilIcon, TrashIcon, ArrowPathIcon } from './Icons';
@@ -27,7 +26,7 @@ const TPSelectorModal: React.FC<{
 }> = ({ isOpen, onClose, onConfirm, subjectId, selectedClass, selectedYear, userId }) => {
     const [tpData, setTpData] = useState<LearningOutcomeElement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [selection, setSelection] = useState<Record<string, Set<string>>>({}); // { [elementId]: Set<objectiveId> }
+    const [selection, setSelection] = useState<Record<string, Set<string>>>({}); 
 
     useEffect(() => {
         if (isOpen && subjectId) {
@@ -101,7 +100,7 @@ const TPSelectorModal: React.FC<{
         }
         
         onConfirm({ elements: selectedElements, tps: selectedTps });
-        setSelection({}); // Reset for next time
+        setSelection({}); 
     };
 
     return (
@@ -152,8 +151,8 @@ const TPSelectorModal: React.FC<{
                     )}
                 </div>
                 <div className="mt-6 flex justify-end space-x-3">
-                    <button onClick={onClose} className="btn-secondary">Batal</button>
-                    <button onClick={handleConfirmClick} className="btn-primary">Tambahkan ke ATP</button>
+                    <button onClick={onClose} className="px-4 py-2 border rounded-md hover:bg-gray-100">Batal</button>
+                    <button onClick={handleConfirmClick} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Tambahkan ke ATP</button>
                 </div>
             </div>
         </div>
@@ -161,7 +160,7 @@ const TPSelectorModal: React.FC<{
 };
 
 
-const WrappingTextarea: React.FC<{ value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; disabled: boolean; placeholder?: string; }> = ({ value, onChange, disabled, placeholder }) => {
+const WrappingTextarea: React.FC<{ value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; disabled: boolean; placeholder?: string; className?: string; }> = ({ value, onChange, disabled, placeholder, className = '' }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     useLayoutEffect(() => {
         const textarea = textareaRef.current;
@@ -178,7 +177,7 @@ const WrappingTextarea: React.FC<{ value: string; onChange: (e: React.ChangeEven
             onChange={onChange}
             disabled={disabled}
             placeholder={placeholder}
-            className={`w-full p-2 border-none bg-transparent focus:outline-none ${!disabled ? 'focus:bg-indigo-50' : ''} rounded resize-none overflow-hidden block`}
+            className={`w-full p-2 border-none bg-transparent focus:outline-none ${!disabled ? 'focus:bg-indigo-50' : ''} rounded resize-none overflow-hidden block ${className}`}
             rows={1}
         />
     );
@@ -242,8 +241,8 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
     const [isTpModalOpen, setIsTpModalOpen] = useState(false);
     const [targetSemesterForImport, setTargetSemesterForImport] = useState<'ganjil' | 'genap'>('ganjil');
 
-    const [schoolIdentity, setSchoolIdentity] = useState<any>(null);
-    const [teacher, setTeacher] = useState<any>(null);
+    const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
+    const [teacher, setTeacher] = useState<Teacher | null>(null);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
@@ -396,18 +395,30 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
         });
     };
 
-    const handleAddLine = (semester: 'ganjil' | 'genap', rowIndex: number, field: 'learningGoalPathway' | 'materialScope') => {
+    const handleLineChange = (semester: 'ganjil' | 'genap', rowIndex: number, field: 'learningGoalPathway' | 'materialScope', lineIndex: number, value: string) => {
         setAtpData(prev => {
             const newRows = [...prev[semester]];
             const currentRow = { ...newRows[rowIndex] };
             const lines = (currentRow[field] || '').split('\n');
+            lines[lineIndex] = value;
+            currentRow[field] = lines.join('\n');
+            newRows[rowIndex] = currentRow;
+            return { ...prev, [semester]: newRows };
+        });
+    };
+
+    const handleAddLine = (semester: 'ganjil' | 'genap', rowIndex: number, field: 'learningGoalPathway' | 'materialScope') => {
+        setAtpData(prev => {
+            const newRows = [...prev[semester]];
+            const currentRow = { ...newRows[rowIndex] };
+            const currentContent = (currentRow[field] || '').trim();
+            const lines = currentContent === '' ? [''] : (currentRow[field] || '').split('\n');
             lines.push(''); 
             currentRow[field] = lines.join('\n');
             newRows[rowIndex] = currentRow;
             return { ...prev, [semester]: newRows };
         });
     };
-    
 
     const handleRemoveLine = (semester: 'ganjil' | 'genap', rowIndex: number, field: 'learningGoalPathway' | 'materialScope', lineIndex: number) => {
         setAtpData(prev => {
@@ -415,18 +426,6 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
             const currentRow = { ...newRows[rowIndex] };
             const lines = (currentRow[field] || '').split('\n');
             lines.splice(lineIndex, 1);
-            currentRow[field] = lines.join('\n');
-            newRows[rowIndex] = currentRow;
-            return { ...prev, [semester]: newRows };
-        });
-    };
-    
-    const handleLineChange = (semester: 'ganjil' | 'genap', rowIndex: number, field: 'learningGoalPathway' | 'materialScope', lineIndex: number, value: string) => {
-        setAtpData(prev => {
-            const newRows = [...prev[semester]];
-            const currentRow = { ...newRows[rowIndex] };
-            const lines = (currentRow[field] || '').split('\n');
-            lines[lineIndex] = value;
             currentRow[field] = lines.join('\n');
             newRows[rowIndex] = currentRow;
             return { ...prev, [semester]: newRows };
@@ -464,14 +463,13 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
         const newRow: ATPRow = {
             id: crypto.randomUUID(),
             element: uniqueElementNames.join(', '),
-            learningGoalPathway: tpTexts.map(tp => `- ${tp}`).join('\n'),
+            learningGoalPathway: tpTexts.join('\n'),
             material: '',
             materialScope: '',
         };
         
         setAtpData(prev => {
             const targetRows = prev[targetSemesterForImport];
-            // Remove empty rows if any
             const cleanedRows = targetRows.filter(row => row.element || row.learningGoalPathway || row.material || row.materialScope);
             return {
                 ...prev,
@@ -499,8 +497,8 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
                 1. Buat ATP yang terstruktur, logis, dan mengalir dari yang sederhana ke yang kompleks.
                 2. Pisahkan ATP untuk Semester 1 (Ganjil) dan Semester 2 (Genap).
                 3. Setiap baris ATP harus mencakup: Elemen, Alur Tujuan Pembelajaran (TP), ${materialType}, dan ${scopeType}.
-                4. "Alur Tujuan Pembelajaran" bisa berisi beberapa TP, masing-masing diawali dengan tanda "-".
-                5. "${scopeType}" bisa berisi beberapa poin, masing-masing diawali dengan tanda "-".
+                4. "Alur Tujuan Pembelajaran" berisi teks-teks TP tanpa nomor atau bullet (pisahkan dengan newline \\n).
+                5. "${scopeType}" berisi poin-poin materi (pisahkan dengan newline \\n).
                 6. Buat sekitar 4 hingga 6 baris ATP untuk SETIAP semester.
     
                 Berikan jawaban HANYA dalam format JSON yang valid sesuai skema berikut:
@@ -543,7 +541,7 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
             };
     
             const response = await generateContentWithRotation({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3-flash-preview',
                 contents: prompt,
                 config: { responseMimeType: "application/json", responseSchema: schema },
             });
@@ -582,10 +580,10 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
 
         try {
             const { jsPDF } = jspdf;
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] }); // F4 Landscape
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] }); 
 
-            const margin = { top: 20, left: 20, right: 20, bottom: 20 };
-            const contentWidth = 330 - margin.left - margin.right;
+            const margin = { top: 15, left: 25, right: 15, bottom: 7 }; 
+            const pageWidth = 330;
             const pageHeight = 215;
             let y = margin.top;
 
@@ -595,85 +593,134 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
             pdf.setTextColor(0, 0, 0);
             pdf.text(`ALUR TUJUAN PEMBELAJARAN - ${selectedSubjectName.toUpperCase()}`, 165, y, { align: 'center' });
             y += 6;
-            pdf.text(schoolIdentity?.schoolName.toUpperCase() || 'SD .............................................................................', 165, y, { align: 'center' });
+            pdf.text(schoolIdentity.schoolName.toUpperCase(), 165, y, { align: 'center' });
             y += 6;
             pdf.setFontSize(11);
             pdf.text(`KELAS ${selectedClass.toUpperCase().replace('KELAS ', '')} - SEMESTER ${selectedSemester.toUpperCase()} - TAHUN AJARAN ${selectedYear}`, 165, y, { align: 'center' });
             y += 10;
 
-            const head = [['Elemen', 'Alur Tujuan Pembelajaran', isLanguageSubject(selectedSubjectName) ? 'Topik Sastra/Teks' : 'Materi', isLanguageSubject(selectedSubjectName) ? 'Kegiatan/Keterampilan Bahasa' : 'Lingkup Materi']];
+            const isBahasa = isLanguageSubject(selectedSubjectName);
+            const head = [['Elemen', 'Alur Tujuan Pembelajaran', isBahasa ? 'Topik Sastra/Teks' : 'Materi', isBahasa ? 'Kegiatan/Keterampilan Bahasa' : 'Lingkup Materi']];
             const body: any[] = [];
-
-            // In PDF, we might still want to print based on selected semester or both. 
-            // Usually ATP is a full year document, but for semantic consistency with the header,
-            // we will filter based on selected semester in PDF as well if requested.
-            // However, typically users want to print the whole thing. I will print the selected one to match the title.
             
             const targetRows = selectedSemester === 'Ganjil' ? atpData.ganjil : atpData.genap;
             
             targetRows.forEach(row => {
-                if (row.learningGoalPathway.trim() !== '' || row.element.trim() !== '') {
-                    body.push([row.element, row.learningGoalPathway, row.material, row.materialScope]);
-                }
+                const tps = (row.learningGoalPathway || '').split('\n').filter(l => l.trim());
+                /* COMMENT: Replaced numbering with bullets (•) in PDF export */
+                const formattedTps = tps.map(tp => {
+                    const cleanTp = tp.replace(/^[0-9\.\-\s•]+/, '').trim();
+                    return `• ${cleanTp}`;
+                }).join('\n');
+
+                const scopes = (row.materialScope || '').split('\n').filter(l => l.trim());
+                const formattedScopes = scopes.map(sc => {
+                    const cleanSc = sc.replace(/^[\-\s\u2022]+/, '').trim();
+                    return `- ${cleanSc}`;
+                }).join('\n');
+
+                body.push([row.element, formattedTps, row.material, formattedScopes]);
             });
 
             (pdf as any).autoTable({
                 head, body, startY: y, theme: 'grid',
                 headStyles: {
-                    fillColor: [255, 255, 255], 
-                    textColor: 0, 
-                    fontStyle: 'bold',
+                    fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold',
                     halign: 'center', valign: 'middle', lineColor: 0, lineWidth: 0.1
                 },
                 styles: { 
-                    fontSize: 9, 
-                    lineColor: 0, 
-                    lineWidth: 0.1, 
-                    cellPadding: 2, 
-                    valign: 'top',
-                    textColor: 0
+                    fontSize: 9, lineColor: 0, lineWidth: 0.1, cellPadding: 2, 
+                    valign: 'top', textColor: 0
                 },
                 columnStyles: {
-                    0: { cellWidth: 45 },
-                    1: { cellWidth: 105 },
-                    2: { cellWidth: 65 },
-                    3: { cellWidth: 75 },
+                    0: { cellWidth: 40 },
+                    1: { cellWidth: 110 },
+                    2: { cellWidth: 60 },
+                    3: { cellWidth: 70 },
                 },
-                margin: { left: margin.left, right: margin.right }
+                margin: { left: margin.left, right: margin.right, bottom: margin.bottom },
+                didDrawCell: (data: any) => {
+                    if ((data.column.index === 1 || data.column.index === 3) && data.section === 'body') {
+                        const doc = data.doc;
+                        const cell = data.cell;
+                        const padding = cell.styles.cellPadding;
+                        const pLeft = (typeof padding === 'number') ? padding : (padding && typeof padding.left === 'number' ? padding.left : 0);
+                        const pTop = (typeof padding === 'number') ? padding : (padding && typeof padding.top === 'number' ? padding.top : 0);
+                        const startX = (cell.x || 0) + pLeft;
+                        const scale = doc.internal.scaleFactor || 1;
+                        const fs = doc.getFontSize() || 9;
+                        let currentY = (cell.y || 0) + pTop + (fs / scale * 0.8);
+                        const lines = Array.isArray(cell.text) ? cell.text : [cell.text];
+                        if (!lines || lines.length === 0) return;
+
+                        doc.setFillColor(cell.styles.fillColor || [255, 255, 255]);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'F');
+                        doc.setDrawColor(cell.styles.lineColor || 0);
+                        doc.setLineWidth(cell.styles.lineWidth || 0.1);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'S');
+
+                        let currentHangingIndent = 0;
+                        const lhFactor = (typeof cell.styles.lineHeight === 'number') ? cell.styles.lineHeight : 1.15;
+                        const lineStep = (fs / scale) * lhFactor;
+
+                        lines.forEach((line: any) => {
+                            const textLine = String(line || '');
+                            const cleanLine = textLine.trim();
+                            if (!cleanLine) { currentY += lineStep; return; }
+
+                            const match = cleanLine.match(/^(\d+[\.\)]|\-|\u2022|•)\s+/);
+                            if (match) {
+                                const prefix = match[0];
+                                currentHangingIndent = doc.getStringUnitWidth(prefix) * fs / scale;
+                                doc.text(textLine, startX, currentY);
+                            } else {
+                                doc.text(textLine, startX + currentHangingIndent, currentY);
+                            }
+                            currentY += lineStep;
+                        });
+                    }
+                }
             });
 
-            y = (pdf as any).lastAutoTable.finalY + 15;
+            y = (pdf as any).lastAutoTable.finalY + 7; 
 
             // Signatures
             if (signatureOption !== 'none') {
-                if (y > pageHeight - 50) {
+                if (y + 40 > pageHeight - margin.bottom) {
                     pdf.addPage();
-                    y = margin.top;
+                    y = margin.top + 10;
                 }
 
                 pdf.setFontSize(11);
                 pdf.setFont('helvetica', 'normal');
                 const formattedDate = new Date(signatureDate + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-                
                 const principalX = margin.left + 50;
                 const teacherX = 330 - margin.right - 50;
 
                 if (signatureOption === 'both') {
                     pdf.text('Mengetahui,', principalX, y, { align: 'center' });
-                    pdf.text('Kepala Sekolah', principalX, y + 6, { align: 'center' });
+                    pdf.text('Kepala Sekolah', principalX, y + 4.5, { align: 'center' }); 
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity?.principalName || '.....................................', principalX, y + 28, { align: 'center' });
+                    const ksName = schoolIdentity.principalName || '.....................................';
+                    pdf.text(ksName, principalX, y + 23, { align: 'center' }); 
+                    const ksW = pdf.getStringUnitWidth(ksName) * 11 / pdf.internal.scaleFactor;
+                    pdf.setLineWidth(0.2);
+                    pdf.line(principalX - ksW/2, y + 23.5, principalX + ksW/2, y + 23.5);
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity?.principalNip || '...................'}`, principalX, y + 34, { align: 'center' });
+                    pdf.text(`NIP. ${schoolIdentity.principalNip || '...................'}`, principalX, y + 27.5, { align: 'center' }); 
                 }
 
                 if (signatureOption === 'teacher' || signatureOption === 'both') {
-                    pdf.text(`${schoolIdentity?.city || '...................'}, ${formattedDate}`, teacherX, y, { align: 'center' });
-                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 6, { align: 'center' });
+                    pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, teacherX, y, { align: 'center' });
+                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 4.5, { align: 'center' });
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(teacher?.fullName || '.....................................', teacherX, y + 28, { align: 'center' });
+                    const guruName = teacher.fullName || '.....................................';
+                    pdf.text(guruName, teacherX, y + 23, { align: 'center' });
+                    const gW = pdf.getStringUnitWidth(guruName) * 11 / pdf.internal.scaleFactor;
+                    pdf.setLineWidth(0.2);
+                    pdf.line(teacherX - gW/2, y + 23.5, teacherX + gW/2, y + 23.5);
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${teacher?.nip || '...................'}`, teacherX, y + 34, { align: 'center' });
+                    pdf.text(`NIP. ${teacher.nip || '...................'}`, teacherX, y + 27.5, { align: 'center' });
                 }
             }
             
@@ -718,8 +765,8 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
                 <div className="flex items-center space-x-2">
                     {isEditing ? (
                         <>
-                            <button onClick={handleCancel} className="btn-secondary">Batal</button>
-                            <button onClick={handleSave} disabled={isSaving} className="btn-primary">
+                            <button onClick={handleCancel} className="px-4 py-2 border rounded-md hover:bg-gray-100">Batal</button>
+                            <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow disabled:bg-indigo-400">
                                 {isSaving ? 'Menyimpan...' : 'Simpan'}
                             </button>
                         </>
@@ -757,7 +804,7 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
                                     </div>
                                 )}
                             </div>
-                            <button onClick={handleEdit} disabled={isLoading} className="btn-primary"><PencilIcon/> Edit</button>
+                            <button onClick={handleEdit} disabled={isLoading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow flex items-center space-x-2"><PencilIcon/> Edit</button>
                         </>
                     )}
                 </div>
@@ -779,7 +826,7 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
             )}
              <header className="text-center mb-6">
                 <h1 className="text-xl font-bold uppercase">ALUR TUJUAN PEMBELAJARAN - {selectedSubjectName.toUpperCase()}</h1>
-                <p className="text-lg font-bold uppercase">{schoolIdentity?.schoolName || 'SD .............................................................................'}</p>
+                <p className="text-lg font-bold uppercase">{schoolIdentity?.schoolName}</p>
                 <p className="text-md text-gray-600 uppercase">KELAS {selectedClass.replace('Kelas ', '')} - SEMESTER {selectedSemester.toUpperCase()} - TAHUN AJARAN {selectedYear}</p>
             </header>
             {isEditing && (
@@ -788,8 +835,8 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
                         <h3 className="text-lg font-semibold text-purple-800">Generate ATP 1 Tahun</h3>
                         <p className="text-sm text-purple-700">Gunakan AI untuk membuat ATP Semester 1 & 2 sekaligus.</p>
                     </div>
-                    <button onClick={handleGenerateWithAI} disabled={isSaving || isGenerating} className="btn-ai">
-                        {isGenerating ? (<svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : (<SparklesIcon />)}
+                    <button onClick={handleGenerateWithAI} disabled={isSaving || isGenerating} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2">
+                        {isGenerating ? (<svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : (<SparklesIcon />)}
                         <span>{isGenerating ? 'Memproses...' : 'Generate AI'}</span>
                     </button>
                 </div>
@@ -807,51 +854,92 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
                         </tr>
                     </thead>
                     <tbody className="bg-white">
-                        {displayRows.length > 0 ? displayRows.map((row, index) => (
+                        {displayRows.length > 0 ? displayRows.map((row, index) => {
+                            const tps = isEditing ? (row.learningGoalPathway || '').split('\n') : (row.learningGoalPathway || '').split('\n').filter(l => l.trim());
+                            const materialScopes = isEditing ? (row.materialScope || '').split('\n') : (row.materialScope || '').split('\n').filter(l => l.trim());
+                            
+                            return (
                             <tr key={row.id} className="align-top hover:bg-gray-50">
                                 <td className="p-1 border w-[15%]">
                                     <WrappingTextarea 
                                         value={row.element} 
                                         onChange={e => handleRowChange(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'element', e.target.value)} 
                                         disabled={!isEditing} 
+                                        placeholder="Nama Elemen"
                                     />
                                 </td>
-                                <td className="p-1 border w-[30%]">
-                                    {(row.learningGoalPathway || '').split('\n').map((line, lineIndex) => (
-                                        <div key={lineIndex} className="flex items-start">
-                                            <WrappingTextarea 
-                                                value={line} 
-                                                onChange={e => handleLineChange(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'learningGoalPathway', lineIndex, e.target.value)} 
-                                                disabled={!isEditing} 
-                                            />
-                                            {isEditing && <button onClick={() => handleRemoveLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'learningGoalPathway', lineIndex)} className="text-red-500 p-1 mt-1"><TrashIcon className="w-3 h-3"/></button>}
+                                <td className="p-1 border w-[35%]">
+                                    {!isEditing ? (
+                                        <div className="space-y-1 p-2">
+                                            {tps.map((line, lIdx) => {
+                                                /* COMMENT: Replaced numbering with bullets (•) in UI display */
+                                                const cleanTp = line.replace(/^[0-9\.\-\s•]+/, '').trim();
+                                                return (
+                                                    <div key={lIdx} className="flex items-start">
+                                                        <span className="shrink-0 w-6 font-semibold text-center">•</span>
+                                                        <span className="flex-1">{cleanTp}</span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                    ))}
-                                    {isEditing && <button onClick={() => handleAddLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'learningGoalPathway')} className="text-xs text-indigo-600 font-semibold mt-1">+ Tambah Baris TP</button>}
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {tps.map((line, lineIndex) => (
+                                                <div key={lineIndex} className="flex items-start group">
+                                                    <WrappingTextarea 
+                                                        value={line} 
+                                                        onChange={e => handleLineChange(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'learningGoalPathway', lineIndex, e.target.value)} 
+                                                        disabled={!isEditing} 
+                                                        placeholder="Tujuan Pembelajaran"
+                                                    />
+                                                    <button onClick={() => handleRemoveLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'learningGoalPathway', lineIndex)} className="text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon className="w-3 h-3"/></button>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => handleAddLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'learningGoalPathway')} className="text-[10px] text-indigo-600 font-bold px-2 py-1">+ BARIS TP</button>
+                                        </div>
+                                    )}
                                 </td>
-                                <td className="p-1 border w-[25%]">
+                                <td className="p-1 border w-[20%]">
                                     <WrappingTextarea 
                                         value={row.material} 
                                         onChange={e => handleRowChange(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'material', e.target.value)} 
                                         disabled={!isEditing} 
+                                        placeholder="Pokok Materi"
                                     />
                                 </td>
                                 <td className="p-1 border w-[30%]">
-                                    {(row.materialScope || '').split('\n').map((line, lineIndex) => (
-                                        <div key={lineIndex} className="flex items-start">
-                                            <WrappingTextarea 
-                                                value={line} 
-                                                onChange={e => handleLineChange(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'materialScope', lineIndex, e.target.value)} 
-                                                disabled={!isEditing} 
-                                            />
-                                            {isEditing && <button onClick={() => handleRemoveLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'materialScope', lineIndex)} className="text-red-500 p-1 mt-1"><TrashIcon className="w-3 h-3"/></button>}
+                                    {!isEditing ? (
+                                        <div className="space-y-1 p-2">
+                                            {materialScopes.map((line, sIdx) => {
+                                                const cleanSc = line.replace(/^[\-\s\u2022]+/, '').trim();
+                                                return (
+                                                    <div key={sIdx} className="flex items-start">
+                                                        <span className="shrink-0 w-4">-</span>
+                                                        <span className="flex-1">{cleanSc}</span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                    ))}
-                                    {isEditing && <button onClick={() => handleAddLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'materialScope')} className="text-xs text-indigo-600 font-semibold mt-1">+ Tambah Baris Lingkup</button>}
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {materialScopes.map((line, lineIndex) => (
+                                                <div key={lineIndex} className="flex items-start group">
+                                                    <WrappingTextarea 
+                                                        value={line} 
+                                                        onChange={e => handleLineChange(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'materialScope', lineIndex, e.target.value)} 
+                                                        disabled={!isEditing} 
+                                                        placeholder="Lingkup Materi"
+                                                    />
+                                                    <button onClick={() => handleRemoveLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'materialScope', lineIndex)} className="text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon className="w-3 h-3"/></button>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => handleAddLine(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', index, 'materialScope')} className="text-[10px] text-indigo-600 font-bold px-2 py-1">+ BARIS LINGKUP</button>
+                                        </div>
+                                    )}
                                 </td>
                                 {isEditing && <td className="p-1 border text-center align-middle"><button onClick={() => handleRemoveRow(selectedSemester === 'Ganjil' ? 'ganjil' : 'genap', row.id)} className="text-red-500 p-1"><TrashIcon className="w-4 h-4" /></button></td>}
                             </tr>
-                        )) : (
+                        )}) : (
                             <tr><td colSpan={isEditing ? 5 : 4} className="text-center py-4 text-gray-500">Belum ada data {selectedSemester}.</td></tr>
                         )}
                         {isEditing && (
@@ -903,8 +991,6 @@ const LearningGoalsPathway: React.FC<LearningGoalsPathwayProps> = ({ selectedCla
                     </div>
                 </div>
             )}
-
-             <style>{`.btn-primary{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem;background-color:#4f46e5;color:#fff;border-radius:.5rem;font-weight:600}.btn-primary:disabled{opacity:.6;cursor:not-allowed}.btn-secondary{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem;background-color:#e5e7eb;color:#1f2937;border-radius:.5rem;font-weight:600}.btn-ai{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem;background-color:#9333ea;color:#fff;border-radius:.5rem;font-weight:600}.btn-ai:disabled{opacity:.6;cursor:not-allowed}`}</style>
         </div>
     );
 };

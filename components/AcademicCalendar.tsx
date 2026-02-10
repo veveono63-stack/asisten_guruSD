@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, FormEvent } from 'react';
 import { SchoolIdentity, AcademicEvent, Teacher } from '../types';
 import { getSchoolIdentity, getCalendarEvents, saveCalendarEvents, getTeacherProfile, pullCalendarDataToTeacher } from '../services/adminService';
@@ -717,7 +716,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
             pdf.text('HARI EFEKTIF, KEGIATAN SEKOLAH, DAN HARI LIBUR', pageWidth / 2, 15, { align: 'center' });
             pdf.setFontSize(10);
             pdf.text(`TAHUN AJARAN ${selectedYear}`, pageWidth / 2, 20, { align: 'center' });
-            pdf.text(schoolIdentity.schoolName.toUpperCase(), pageWidth / 2, 25, { align: 'center' });
+            pdf.text(String(schoolIdentity.schoolName || '').toUpperCase(), pageWidth / 2, 25, { align: 'center' });
     
             const colorMap: { [key: string]: [number, number, number] } = {
                 'bg-red-500': [239, 68, 68],
@@ -816,15 +815,15 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
                 const color = colorMap[colorKey as keyof typeof colorMap];
     
                 if (color) {
-                    pdf.setFillColor.apply(null, color);
+                    pdf.setFillColor(color[0], color[1], color[2]);
                     pdf.rect(legendX, legendY - 2.5, 10, 3, 'F');
                 }
                 pdf.setFont('helvetica', 'bold');
                 pdf.setTextColor(0);
-                pdf.text(code, legendX + 5, legendY, { align: 'center' });
+                pdf.text(String(code), legendX + 5, legendY, { align: 'center' });
                 
                 pdf.setFont('helvetica', 'normal');
-                pdf.text(`: ${item.label}`, legendX + 11, legendY);
+                pdf.text(`: ${String(item.label)}`, legendX + 11, legendY);
                 legendX += 80;
                 legendColumnCount++;
             });
@@ -837,9 +836,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
             pdf.setFont('helvetica', 'normal');
             const midPoint = Math.ceil(holidayList.length / 2);
             for (let i = 0; i < midPoint; i++) {
-                pdf.text(`${holidayList[i].date} : ${holidayList[i].description}`, infoBlockX, holidayListY + (i * 3));
+                pdf.text(`${String(holidayList[i].date)} : ${String(holidayList[i].description)}`, infoBlockX, holidayListY + (i * 3));
                 if (holidayList[i + midPoint]) {
-                    pdf.text(`${holidayList[i + midPoint].date} : ${holidayList[i + midPoint].description}`, infoBlockX + 120, holidayListY + (i * 3));
+                    pdf.text(`${String(holidayList[i + midPoint].date)} : ${String(holidayList[i + midPoint].description)}`, infoBlockX + 120, holidayListY + (i * 3));
                 }
             }
             
@@ -880,12 +879,12 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
                     pdf.text('Mengetahui,', principalSignatureX, signatureBlockStartY);
                     pdf.text('Kepala Sekolah', principalSignatureX, signatureBlockStartY + 5);
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalSignatureX, signatureBlockStartY + 25);
-                    const principalNameWidth = pdf.getStringUnitWidth(schoolIdentity.principalName) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+                    pdf.text(String(schoolIdentity.principalName || ''), principalSignatureX, signatureBlockStartY + 25);
+                    const principalNameWidth = pdf.getStringUnitWidth(String(schoolIdentity.principalName || '')) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
                     pdf.setLineWidth(0.2);
                     pdf.line(principalSignatureX, signatureBlockStartY + 25.5, principalSignatureX + principalNameWidth, signatureBlockStartY + 25.5);
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalSignatureX, signatureBlockStartY + 30);
+                    pdf.text(`NIP. ${String(schoolIdentity.principalNip || '')}`, principalSignatureX, signatureBlockStartY + 30);
                 }
 
                 if (signatureOption === 'teacher' || signatureOption === 'both') {
@@ -893,13 +892,11 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
                     pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, signatureXTeacher, signatureBlockStartY);
                     pdf.text(`Guru ${selectedClass}`, signatureXTeacher, signatureBlockStartY + 5);
                     pdf.setFont('helvetica', 'bold');
-                    /* COMMENT: Fix missing 'teacherProfile' name error by using the correct state 'teacher' */
-                    pdf.text(teacher.fullName, signatureXTeacher, signatureBlockStartY + 25);
-                    const teacherNameWidth = pdf.getStringUnitWidth(teacher.fullName) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+                    pdf.text(String(teacher.fullName || ''), signatureXTeacher, signatureBlockStartY + 25);
+                    const teacherNameWidth = pdf.getStringUnitWidth(String(teacher.fullName || '')) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
                     pdf.line(signatureXTeacher, signatureBlockStartY + 25.5, signatureXTeacher + teacherNameWidth, signatureBlockStartY + 25.5);
                     pdf.setFont('helvetica', 'normal');
-                    /* COMMENT: Fix missing 'teacherProfile' name error by using the correct state 'teacher' */
-                    pdf.text(`NIP. ${teacher.nip}`, signatureXTeacher, signatureBlockStartY + 30);
+                    pdf.text(`NIP. ${String(teacher.nip || '')}`, signatureXTeacher, signatureBlockStartY + 30);
                 }
             }
     
@@ -1152,7 +1149,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
             pdf.text('KALENDER PENDIDIKAN', pageWidth / 2, currentY, { align: 'center' });
             currentY += 7;
             pdf.setFontSize(12);
-            pdf.text(schoolIdentity.schoolName.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+            pdf.text(String(schoolIdentity.schoolName || '').toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
             currentY += 6;
             const semesterTitle = activeTab === 'semester1' ? `SEMESTER I TAHUN AJARAN ${selectedYear}` : `SEMESTER II TAHUN AJARAN ${selectedYear}`;
             pdf.text(semesterTitle, pageWidth / 2, currentY, { align: 'center' });
@@ -1203,12 +1200,12 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
                     pdf.text('Mengetahui,', principalSignatureX, finalY);
                     pdf.text('Kepala Sekolah', principalSignatureX, finalY + 5);
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalSignatureX, finalY + 25);
-                    const principalNameWidth = pdf.getStringUnitWidth(schoolIdentity.principalName) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+                    pdf.text(String(schoolIdentity.principalName || ''), principalSignatureX, finalY + 25);
+                    const principalNameWidth = pdf.getStringUnitWidth(String(schoolIdentity.principalName || '')) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
                     pdf.setLineWidth(0.2);
                     pdf.line(principalSignatureX, finalY + 25.5, principalSignatureX + principalNameWidth, finalY + 25.5);
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalSignatureX, finalY + 30);
+                    pdf.text(`NIP. ${String(schoolIdentity.principalNip || '')}`, principalSignatureX, finalY + 30);
                 }
 
                 if (signatureOption === 'teacher' || signatureOption === 'both') {
@@ -1216,14 +1213,11 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ selectedClass, sele
                     pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, signatureXTeacher, finalY);
                     pdf.text(`Guru ${selectedClass}`, signatureXTeacher, finalY + 5);
                     pdf.setFont('helvetica', 'bold');
-                    /* COMMENT: Fix missing 'teacherProfile' name error by using the correct state 'teacher' */
-                    pdf.text(teacher.fullName, signatureXTeacher, finalY + 25);
-                    const teacherNameWidth = pdf.getStringUnitWidth(teacher.fullName) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
-                    /* COMMENT: Fix horizontal line y2 coordinate bug in handleDownloadSemesterPDF */
+                    pdf.text(String(teacher.fullName || ''), signatureXTeacher, finalY + 25);
+                    const teacherNameWidth = pdf.getStringUnitWidth(String(teacher.fullName || '')) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
                     pdf.line(signatureXTeacher, finalY + 25.5, signatureXTeacher + teacherNameWidth, finalY + 25.5);
                     pdf.setFont('helvetica', 'normal');
-                    /* COMMENT: Fix missing 'teacherProfile' name error by using the correct state 'teacher' */
-                    pdf.text(`NIP. ${teacher.nip}`, signatureXTeacher, finalY + 30);
+                    pdf.text(`NIP. ${String(teacher.nip || '')}`, signatureXTeacher, finalY + 30);
                 }
             }
     

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useLayoutEffect, useRef } from 'react';
 import { ProtaData, ProtaRow, Teacher, SchoolIdentity, Subject } from '../types';
 import { getProta, updateProta, getTeacherProfile, getSchoolIdentity, getSubjects, getCalendarEvents, getClassSchedule, pullProtaToTeacher } from '../services/adminService';
@@ -30,7 +29,7 @@ const getSortIndex = (subjectName: string): number => {
     return index === -1 ? 99 : index;
 };
 
-const WrappingTextarea: React.FC<{ value: string; disabled: boolean; }> = ({ value, disabled }) => {
+const WrappingTextarea: React.FC<{ value: string; disabled: boolean; className?: string }> = ({ value, disabled, className = "" }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     useLayoutEffect(() => {
         const textarea = textareaRef.current;
@@ -45,7 +44,7 @@ const WrappingTextarea: React.FC<{ value: string; disabled: boolean; }> = ({ val
             ref={textareaRef}
             value={value}
             disabled={disabled}
-            className="w-full p-2 border-none bg-transparent focus:outline-none rounded resize-none overflow-hidden block"
+            className={`w-full p-2 border-none bg-transparent focus:outline-none rounded resize-none overflow-hidden block ${className}`}
             rows={1}
         />
     );
@@ -323,11 +322,13 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
         try {
             const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] });
-            const margin = { top: 5, left: 25, right: 5, bottom: 5 };
-            const contentWidth = 215 - margin.left - margin.right;
+            const margin = { top: 10, left: 25, right: 5, bottom: 7 }; 
+            const pageWidth = 215;
             const pageHeight = 330;
-            let y = margin.top + 10;
+            const contentWidth = pageWidth - margin.left - margin.right;
+            let y = margin.top + 5;
 
+            // Header
             pdf.setFont('helvetica', 'bold');
             pdf.setFontSize(12);
             pdf.setTextColor(0, 0, 0);
@@ -342,22 +343,51 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
             pdf.text(schoolIdentity.schoolName.toUpperCase(), 107.5, y, { align: 'center' });
             y += 10;
 
-            const head = [['Materi/Tema', 'Alur Tujuan Pembelajaran', 'Lingkup Materi', 'Alokasi Waktu (JP)']];
+            const head = [['Materi/Tema', 'Alur Tujuan Pembelajaran', 'Lingkup Materi', 'Alokasi Waktu']];
             const body: any[] = [];
             const totalGanjil = protaData.ganjilRows.reduce((sum, row) => sum + (row.alokasiWaktu || 0), 0);
             const totalGenap = protaData.genapRows.reduce((sum, row) => sum + (row.alokasiWaktu || 0), 0);
 
+            // Ganjil
             if (protaData.ganjilRows.length > 0) {
                 body.push([{ content: 'SEMESTER I (GANJIL)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [255, 255, 255] } }]);
                 protaData.ganjilRows.forEach(row => {
-                    body.push([row.material, row.learningGoalPathway, row.materialScope, { content: row.alokasiWaktu > 0 ? `${row.alokasiWaktu}` : '', styles: { halign: 'center' } }]);
+                    const tps = (row.learningGoalPathway || '').split('\n').filter(l => l.trim());
+                    /* COMMENT: Changed PDF numbering to bullet point for Ganjil */
+                    const formattedTps = tps.map(tp => {
+                        const cleanTp = tp.replace(/^[0-9\.\-\s•]+/, '').trim();
+                        return `• ${cleanTp}`;
+                    }).join('\n');
+
+                    const scopes = (row.materialScope || '').split('\n').filter(l => l.trim());
+                    const formattedScopes = scopes.map(sc => {
+                        const cleanSc = sc.replace(/^[\-\s\u2022]+/, '').trim();
+                        return `- ${cleanSc}`;
+                    }).join('\n');
+
+                    body.push([row.material, formattedTps, formattedScopes, { content: row.alokasiWaktu > 0 ? `${row.alokasiWaktu} JP` : '', styles: { halign: 'center' } }]);
                 });
                 body.push([{ content: 'JUMLAH JAM PELAJARAN SEMESTER I', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }, { content: `${totalGanjil} JP`, styles: { halign: 'center', fontStyle: 'bold' } }]);
             }
+
+            // Genap
             if (protaData.genapRows.length > 0) {
                 body.push([{ content: 'SEMESTER II (GENAP)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [255, 255, 255] } }]);
                 protaData.genapRows.forEach(row => {
-                    body.push([row.material, row.learningGoalPathway, row.materialScope, { content: row.alokasiWaktu > 0 ? `${row.alokasiWaktu}` : '', styles: { halign: 'center' } }]);
+                    const tps = (row.learningGoalPathway || '').split('\n').filter(l => l.trim());
+                    /* COMMENT: Changed PDF numbering to bullet point for Genap */
+                    const formattedTps = tps.map(tp => {
+                        const cleanTp = tp.replace(/^[0-9\.\-\s•]+/, '').trim();
+                        return `• ${cleanTp}`;
+                    }).join('\n');
+
+                    const scopes = (row.materialScope || '').split('\n').filter(l => l.trim());
+                    const formattedScopes = scopes.map(sc => {
+                        const cleanSc = sc.replace(/^[\-\s\u2022]+/, '').trim();
+                        return `- ${cleanSc}`;
+                    }).join('\n');
+
+                    body.push([row.material, formattedTps, formattedScopes, { content: row.alokasiWaktu > 0 ? `${row.alokasiWaktu} JP` : '', styles: { halign: 'center' } }]);
                 });
                 body.push([{ content: 'JUMLAH JAM PELAJARAN SEMESTER II', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }, { content: `${totalGenap} JP`, styles: { halign: 'center', fontStyle: 'bold' } }]);
             }
@@ -365,34 +395,87 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
             (pdf as any).autoTable({
                 head, body, startY: y, theme: 'grid',
                 headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', halign: 'center', valign: 'middle', lineColor: 0, lineWidth: 0.1 },
-                styles: { fontSize: 9, lineColor: 0, lineWidth: 0.1, cellPadding: 2, valign: 'top', textColor: 0 },
-                columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 60 }, 2: { cellWidth: 60 }, 3: { cellWidth: 20 } },
-                margin: { left: margin.left, right: margin.right, top: margin.top, bottom: margin.bottom }
+                styles: { fontSize: 8.5, lineColor: 0, lineWidth: 0.1, cellPadding: 1.5, valign: 'top', textColor: 0 },
+                columnStyles: { 
+                    0: { cellWidth: 25 }, // Materi (Narrow)
+                    1: { cellWidth: 85 }, // ATP (Widened)
+                    2: { cellWidth: 60 }, // Scope
+                    3: { cellWidth: 15 }  // JP (Narrow)
+                },
+                margin: { left: margin.left, right: margin.right, top: margin.top, bottom: margin.bottom },
+                didDrawCell: (data: any) => {
+                    if ((data.column.index === 1 || data.column.index === 2) && data.section === 'body' && typeof data.cell.raw !== 'object') {
+                        const doc = data.doc;
+                        const cell = data.cell;
+                        const padding = cell.styles.cellPadding;
+                        const pLeft = (typeof padding === 'number') ? padding : (padding && typeof padding.left === 'number' ? padding.left : 0);
+                        const pTop = (typeof padding === 'number') ? padding : (padding && typeof padding.top === 'number' ? padding.top : 0);
+                        const startX = (cell.x || 0) + pLeft;
+                        const scale = doc.internal.scaleFactor || 1;
+                        const fs = doc.getFontSize() || 8.5;
+                        let currentY = (cell.y || 0) + pTop + (fs / scale * 0.8);
+                        const lines = Array.isArray(cell.text) ? cell.text : [cell.text];
+                        if (!lines || lines.length === 0) return;
+
+                        doc.setFillColor(cell.styles.fillColor || [255, 255, 255]);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'F');
+                        doc.setDrawColor(cell.styles.lineColor || 0);
+                        doc.setLineWidth(cell.styles.lineWidth || 0.1);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'S');
+
+                        let currentHangingIndent = 0;
+                        const lhFactor = (typeof cell.styles.lineHeight === 'number') ? cell.styles.lineHeight : 1.15;
+                        const lineStep = (fs / scale) * lhFactor;
+
+                        lines.forEach((line: any) => {
+                            const textLine = String(line || '');
+                            const cleanLine = textLine.trim();
+                            if (!cleanLine) { currentY += lineStep; return; }
+
+                            const match = cleanLine.match(/^(\d+[\.\)]|\-|\u2022|•)\s+/);
+                            if (match) {
+                                const prefix = match[0];
+                                currentHangingIndent = doc.getStringUnitWidth(prefix) * fs / scale;
+                                doc.text(textLine, startX, currentY);
+                            } else {
+                                doc.text(textLine, startX + currentHangingIndent, currentY);
+                            }
+                            currentY += lineStep;
+                        });
+                    }
+                }
             });
 
-            y = (pdf as any).lastAutoTable.finalY + 15;
+            y = (pdf as any).lastAutoTable.finalY + 7;
             if (signatureOption !== 'none') {
-                if (y > pageHeight - 50) { pdf.addPage(); y = margin.top + 10; }
-                pdf.setFontSize(11);
+                if (y + 40 > pageHeight - margin.bottom) { pdf.addPage(); y = margin.top + 10; }
+                pdf.setFontSize(10);
                 pdf.setFont('helvetica', 'normal');
                 const formattedDate = new Date(signatureDate + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
                 const principalX = margin.left + (contentWidth / 4);
                 const teacherX = 215 - margin.right - (contentWidth / 4);
+                
                 if (signatureOption === 'both') {
                     pdf.text('Mengetahui,', principalX, y, { align: 'center' });
-                    pdf.text('Kepala Sekolah', principalX, y + 6, { align: 'center' });
+                    pdf.text('Kepala Sekolah', principalX, y + 4.5, { align: 'center' }); 
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalX, y + 28, { align: 'center' });
+                    const pName = schoolIdentity.principalName || '..................................';
+                    pdf.text(pName, principalX, y + 23, { align: 'center' });
+                    const pW = pdf.getStringUnitWidth(pName) * 10 / pdf.internal.scaleFactor;
+                    pdf.line(principalX - pW/2, y + 23.5, principalX + pW/2, y + 23.5); 
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalX, y + 34, { align: 'center' });
+                    pdf.text(`NIP. ${schoolIdentity.principalNip || '...................'}`, principalX, y + 27.5, { align: 'center' });
                 }
                 if (signatureOption === 'teacher' || signatureOption === 'both') {
                     pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, teacherX, y, { align: 'center' });
-                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 6, { align: 'center' });
+                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 4.5, { align: 'center' }); 
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(teacher.fullName, teacherX, y + 28, { align: 'center' });
+                    const tName = teacher.fullName || '..................................';
+                    pdf.text(tName, teacherX, y + 23, { align: 'center' });
+                    const tW = pdf.getStringUnitWidth(tName) * 10 / pdf.internal.scaleFactor;
+                    pdf.line(teacherX - tW/2, y + 23.5, teacherX + tW/2, y + 23.5); 
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${teacher.nip}`, teacherX, y + 34, { align: 'center' });
+                    pdf.text(`NIP. ${teacher.nip || '...................'}`, teacherX, y + 27.5, { align: 'center' });
                 }
             }
             pdf.save(`Prota-${selectedSubjectName.replace(/[\s/]/g, '_')}-${selectedYear.replace('/', '-')}.pdf`);
@@ -401,7 +484,7 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
     };
 
     if (isLoading) return <div className="text-center p-8">Memuat data...</div>;
-    
+
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg">
             {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
@@ -427,12 +510,14 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
                                 <span>Tarik dari Induk</span>
                             </button>
                         )}
-                        <label className="text-sm font-medium">Tgl Cetak:</label>
-                        <input type="date" value={signatureDate} onChange={e => setSignatureDate(e.target.value)} className="p-1 border border-gray-300 rounded-md"/>
+                        <label className="text-sm font-medium text-gray-700 shrink-0">Tanggal Cetak:</label>
+                        <input type="date" value={signatureDate} onChange={e => setSignatureDate(e.target.value)} className="p-1 border border-gray-300 rounded-md text-sm"/>
                         <div className="relative">
-                            <button onClick={() => setIsPdfDropdownOpen(!isPdfDropdownOpen)} disabled={isGeneratingPDF || isLoading} className="btn-secondary"><ArrowDownTrayIcon/> {isGeneratingPDF ? 'Memproses...' : 'Download PDF'}</button>
+                            <button onClick={() => setIsPdfDropdownOpen(!isPdfDropdownOpen)} disabled={isGeneratingPDF || isLoading} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold shadow flex items-center space-x-2 disabled:bg-gray-400">
+                                <ArrowDownTrayIcon/> <span>{isGeneratingPDF ? '...' : 'Download PDF'}</span>
+                            </button>
                             {isPdfDropdownOpen && <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
-                                <ul>
+                                <ul className="py-1">
                                     <li><button onClick={() => handleDownloadPDF('none')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Tanpa TTD</button></li>
                                     <li><button onClick={() => handleDownloadPDF('teacher')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Guru</button></li>
                                     <li><button onClick={() => handleDownloadPDF('both')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Guru & KS</button></li>
@@ -471,10 +556,10 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
                 <table className="min-w-full text-sm border-collapse">
                     <thead className="bg-gray-100 text-center font-bold">
                         <tr>
-                            <th className="p-2 border">Materi/Tema</th>
-                            <th className="p-2 border">Alur Tujuan Pembelajaran</th>
-                            <th className="p-2 border">Lingkup Materi</th>
-                            <th className="p-2 border">Alokasi Waktu (JP)</th>
+                            <th className="p-2 border w-[15%]">Materi/Tema</th>
+                            <th className="p-2 border w-[45%]">Alur Tujuan Pembelajaran</th>
+                            <th className="p-2 border w-[30%]">Lingkup Materi</th>
+                            <th className="p-2 border w-[10%]">Alokasi Waktu</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -483,20 +568,43 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
                                 <tr className="bg-blue-100 font-bold">
                                     <td colSpan={4} className="p-2 border text-center">SEMESTER I (GANJIL)</td>
                                 </tr>
-                                {protaData.ganjilRows.map(row => (
-                                    <tr key={row.id} className="align-top hover:bg-gray-50">
-                                        <td className="p-1 border w-[20%] align-middle text-center"><WrappingTextarea value={row.material} disabled={true} /></td>
-                                        <td className="p-1 border w-[35%]"><WrappingTextarea value={row.learningGoalPathway} disabled={true} /></td>
-                                        <td className="p-1 border w-[35%]"><WrappingTextarea value={row.materialScope} disabled={true} /></td>
-                                        <td className="p-1 border w-[10%] align-middle text-center">
-                                            {isEditing ? (
-                                                <input type="number" value={row.alokasiWaktu || ''} onChange={e => handleRowChange(row.id, parseInt(e.target.value, 10) || 0, 'ganjil')} className="w-full p-2 text-center border rounded" />
-                                            ) : (
-                                                row.alokasiWaktu > 0 ? `${row.alokasiWaktu} JP` : ''
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {protaData.ganjilRows.map(row => {
+                                    const tps = (row.learningGoalPathway || '').split('\n').filter(l => l.trim());
+                                    const scopes = (row.materialScope || '').split('\n').filter(l => l.trim());
+                                    return (
+                                        <tr key={row.id} className="align-top hover:bg-gray-50">
+                                            <td className="p-1 border align-middle text-center"><WrappingTextarea value={row.material} disabled={true} /></td>
+                                            <td className="p-1 border">
+                                                <div className="space-y-1 p-2">
+                                                    {tps.map((tp, idx) => (
+                                                        <div key={idx} className="flex items-start">
+                                                            {/* COMMENT: Changed table numbering to bullet point for Ganjil */}
+                                                            <span className="shrink-0 w-6 font-semibold text-center">•</span>
+                                                            <span className="flex-1">{tp.replace(/^[0-9\.\-\s•]+/, '').trim()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="p-1 border">
+                                                <div className="space-y-1 p-2">
+                                                    {scopes.map((sc, scIdx) => (
+                                                        <div key={scIdx} className="flex items-start">
+                                                            <span className="shrink-0 w-4">-</span>
+                                                            <span className="flex-1">{sc.replace(/^[\-\s\u2022]+/, '').trim()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="p-1 border align-middle text-center">
+                                                {isEditing ? (
+                                                    <input type="number" value={row.alokasiWaktu || ''} onChange={e => handleRowChange(row.id, parseInt(e.target.value, 10) || 0, 'ganjil')} className="w-full p-2 text-center border rounded" />
+                                                ) : (
+                                                    row.alokasiWaktu > 0 ? `${row.alokasiWaktu} JP` : ''
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </>
                         )}
                         {protaData.genapRows.length > 0 && (
@@ -504,20 +612,43 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
                                 <tr className="bg-green-100 font-bold">
                                     <td colSpan={4} className="p-2 border text-center">SEMESTER II (GENAP)</td>
                                 </tr>
-                                {protaData.genapRows.map(row => (
-                                    <tr key={row.id} className="align-top hover:bg-gray-50">
-                                        <td className="p-1 border w-[20%] align-middle text-center"><WrappingTextarea value={row.material} disabled={true} /></td>
-                                        <td className="p-1 border w-[35%]"><WrappingTextarea value={row.learningGoalPathway} disabled={true} /></td>
-                                        <td className="p-1 border w-[35%]"><WrappingTextarea value={row.materialScope} disabled={true} /></td>
-                                        <td className="p-1 border w-[10%] align-middle text-center">
-                                            {isEditing ? (
-                                                <input type="number" value={row.alokasiWaktu || ''} onChange={e => handleRowChange(row.id, parseInt(e.target.value, 10) || 0, 'genap')} className="w-full p-2 text-center border rounded" />
-                                            ) : (
-                                                row.alokasiWaktu > 0 ? `${row.alokasiWaktu} JP` : ''
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {protaData.genapRows.map(row => {
+                                    const tps = (row.learningGoalPathway || '').split('\n').filter(l => l.trim());
+                                    const scopes = (row.materialScope || '').split('\n').filter(l => l.trim());
+                                    return (
+                                        <tr key={row.id} className="align-top hover:bg-gray-50">
+                                            <td className="p-1 border align-middle text-center"><WrappingTextarea value={row.material} disabled={true} /></td>
+                                            <td className="p-1 border">
+                                                <div className="space-y-1 p-2">
+                                                    {tps.map((tp, idx) => (
+                                                        <div key={idx} className="flex items-start">
+                                                            {/* COMMENT: Changed table numbering to bullet point for Genap */}
+                                                            <span className="shrink-0 w-6 font-semibold text-center">•</span>
+                                                            <span className="flex-1">{tp.replace(/^[0-9\.\-\s•]+/, '').trim()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="p-1 border">
+                                                <div className="space-y-1 p-2">
+                                                    {scopes.map((sc, scIdx) => (
+                                                        <div key={scIdx} className="flex items-start">
+                                                            <span className="shrink-0 w-4">-</span>
+                                                            <span className="flex-1">{sc.replace(/^[\-\s\u2022]+/, '').trim()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="p-1 border align-middle text-center">
+                                                {isEditing ? (
+                                                    <input type="number" value={row.alokasiWaktu || ''} onChange={e => handleRowChange(row.id, parseInt(e.target.value, 10) || 0, 'genap')} className="w-full p-2 text-center border rounded" />
+                                                ) : (
+                                                    row.alokasiWaktu > 0 ? `${row.alokasiWaktu} JP` : ''
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </>
                         )}
                         {(protaData.ganjilRows.length === 0 && protaData.genapRows.length === 0) && (

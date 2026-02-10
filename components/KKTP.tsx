@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
-import { Subject, KKTPData, KKTPIntervals, KKTPAchievementLevels, KKTPRow } from '../types';
+import { Subject, KKTPData, KKTPIntervals, KKTPAchievementLevels, KKTPRow, SchoolIdentity, Teacher } from '../types';
 import { getSubjects, getKKTP, updateKKTP, getSchoolIdentity, getTeacherProfile, pullKKTPToTeacher } from '../services/adminService';
 import Notification, { NotificationType } from './Notification';
 import { PencilIcon, SparklesIcon, ArrowDownTrayIcon, ArrowPathIcon } from './Icons';
@@ -78,8 +77,8 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
     const [activeArtTab, setActiveArtTab] = useState<string>(masterArtSubjects[0]);
     const [kktpData, setKktpData] = useState<KKTPData>(defaultKktpData);
     const [originalKktpData, setOriginalKktpData] = useState<KKTPData | null>(null);
-    const [schoolIdentity, setSchoolIdentity] = useState<any>(null);
-    const [teacher, setTeacher] = useState<any>(null);
+    const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
+    const [teacher, setTeacher] = useState<Teacher | null>(null);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
@@ -239,10 +238,10 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
                 
                 Aturan:
                 - Setiap deskripsi harus singkat (cukup 1 kalimat).
-                - Jawaban HARUS dalam format array JSON yang valid, di mana setiap objek berisi 'id' dan objek 'kktp' dengan keempat tingkat ketercapaian.
+                - Jawaban HARUS dalam format array JSON yang valid, di mana setiap objek berisi 'id' and objek 'kktp' dengan keempat tingkat ketercapaian.
             `;
             const response = await generateContentWithRotation({
-                model: 'gemini-2.5-flash', contents: prompt,
+                model: 'gemini-3-flash-preview', contents: prompt,
                 config: {
                     responseMimeType: "application/json",
                     responseSchema: {
@@ -335,11 +334,12 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
 
         try {
             const { jsPDF } = jspdf;
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] }); // F4 Landscape
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] }); 
 
-            const margin = { top: 15, left: 15, right: 10, bottom: 15 };
+            const margin = { top: 15, left: 25, right: 15, bottom: 7 }; 
             const pageWidth = 330;
             const pageHeight = 215;
+            const contentWidth = pageWidth - margin.left - margin.right; 
             let y = margin.top;
 
             // Header
@@ -351,13 +351,12 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
             pdf.text(`${selectedSubjectName.toUpperCase()}`, pageWidth / 2, y, { align: 'center' });
             y += 6;
             pdf.setFontSize(11);
-            pdf.text(`KELAS ${selectedClass.toUpperCase().replace('KELAS ', '')} SEMESTER ${selectedSemester.toUpperCase()} TAHUN AJARAN ${selectedYear}`, pageWidth / 2, y, { align: 'center' });
+            pdf.text(`KELAS ${selectedClass.toUpperCase().replace('Kelas ', '')} SEMESTER ${selectedSemester.toUpperCase()} TAHUN AJARAN ${selectedYear}`, pageWidth / 2, y, { align: 'center' });
             y += 6;
             pdf.setFontSize(10);
             pdf.text(schoolIdentity.schoolName.toUpperCase(), pageWidth / 2, y, { align: 'center' });
             y += 10;
 
-            // Table Header Rows
             const head = [
                 [
                     { content: 'Alur Tujuan Pembelajaran', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
@@ -374,11 +373,9 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
                 ]
             ];
             
-            // Build body with Grouping Rows instead of rowSpan for better stability and page breaks
             const body: any[] = [];
             const materialGroups = new Map<string, KKTPRow[]>();
             
-            // Group rows by originalId
             kktpData.rows.forEach(row => {
                 const group = materialGroups.get(row.originalId) || [];
                 group.push(row);
@@ -386,17 +383,17 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
             });
 
             materialGroups.forEach((group) => {
-                // Baris Judul Materi (Full Width)
                 body.push([{ 
                     content: `MATERI/TEMA: ${group[0].material.toUpperCase()}`, 
                     colSpan: 5, 
                     styles: { fontStyle: 'bold', fillColor: [245, 245, 245], textColor: [50, 50, 50] } 
                 }]);
                 
-                // Baris Data ATP & Kriteria
                 group.forEach(row => {
+                    const cleanTp = row.learningGoalPathway.replace(/^[0-9\.\-\s•]+/, '').trim();
+                    /* COMMENT: Changed PDF numbering to bullet point */
                     body.push([
-                        `• ${row.learningGoalPathway}`,
+                        `• ${cleanTp}`,
                         row.kktp.belumTercapai,
                         row.kktp.tercapaiSebagian,
                         row.kktp.tuntas,
@@ -405,44 +402,72 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
                 });
             });
 
+            const equalColWidth = contentWidth / 5;
+
             (pdf as any).autoTable({
-                head, 
-                body, 
-                startY: y, 
-                theme: 'grid',
+                head, body, startY: y, theme: 'grid',
                 headStyles: {
-                    fillColor: [255, 255, 255], 
-                    textColor: 0, 
-                    fontStyle: 'bold',
-                    halign: 'center', 
-                    valign: 'middle', 
-                    lineColor: 0, 
-                    lineWidth: 0.1
+                    fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold',
+                    halign: 'center', valign: 'middle', lineColor: 0, lineWidth: 0.1
                 },
                 styles: { 
-                    fontSize: 8.5, 
-                    lineColor: 0, 
-                    lineWidth: 0.1, 
-                    cellPadding: 2, 
-                    valign: 'top',
-                    textColor: 0 
+                    fontSize: 8.5, lineColor: 0, lineWidth: 0.1, cellPadding: 2, valign: 'top', textColor: 0 
                 },
                 columnStyles: {
-                    0: { cellWidth: 110 }, // ATP diperlebar
-                    1: { cellWidth: 47 }, 
-                    2: { cellWidth: 47 },
-                    3: { cellWidth: 47 },
-                    4: { cellWidth: 47 },
+                    0: { cellWidth: equalColWidth }, 
+                    1: { cellWidth: equalColWidth }, 
+                    2: { cellWidth: equalColWidth },
+                    3: { cellWidth: equalColWidth }, 
+                    4: { cellWidth: equalColWidth },
                 },
-                margin: { left: margin.left, right: margin.right },
-                pageBreak: 'auto'
+                margin: { left: margin.left, right: margin.right, bottom: margin.bottom },
+                didDrawCell: (data: any) => {
+                    if (data.column.index === 0 && data.section === 'body' && !data.row.raw[0].content?.startsWith('MATERI')) {
+                        const doc = data.doc;
+                        const cell = data.cell;
+                        const padding = cell.styles.cellPadding;
+                        const pLeft = (typeof padding === 'number') ? padding : (padding && typeof padding.left === 'number' ? padding.left : 0);
+                        const pTop = (typeof padding === 'number') ? padding : (padding && typeof padding.top === 'number' ? padding.top : 0);
+                        const startX = (cell.x || 0) + pLeft;
+                        const scale = doc.internal.scaleFactor || 1;
+                        const fs = doc.getFontSize() || 8.5;
+                        let currentY = (cell.y || 0) + pTop + (fs / scale * 0.8);
+                        const lines = Array.isArray(cell.text) ? cell.text : [cell.text];
+                        if (!lines || lines.length === 0) return;
+
+                        doc.setFillColor(cell.styles.fillColor || [255, 255, 255]);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'F');
+                        doc.setDrawColor(cell.styles.lineColor || 0);
+                        doc.setLineWidth(cell.styles.lineWidth || 0.1);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'S');
+
+                        let currentHangingIndent = 0;
+                        const lhFactor = (typeof cell.styles.lineHeight === 'number') ? cell.styles.lineHeight : 1.15;
+                        const lineStep = (fs / scale) * lhFactor;
+
+                        lines.forEach((line: any) => {
+                            const textLine = String(line || '');
+                            const cleanLine = textLine.trim();
+                            if (!cleanLine) { currentY += lineStep; return; }
+
+                            const match = cleanLine.match(/^(\d+[\.\)]|\-|\u2022|•)\s+/);
+                            if (match) {
+                                const prefix = match[0];
+                                currentHangingIndent = doc.getStringUnitWidth(prefix) * fs / scale;
+                                doc.text(textLine, startX, currentY);
+                            } else {
+                                doc.text(textLine, startX + currentHangingIndent, currentY);
+                            }
+                            currentY += lineStep;
+                        });
+                    }
+                }
             });
 
-            y = (pdf as any).lastAutoTable.finalY + 15;
+            y = (pdf as any).lastAutoTable.finalY + 7;
 
-            // Signatures
             if (signatureOption !== 'none') {
-                if (y > pageHeight - 50) {
+                if (y + 40 > pageHeight - margin.bottom) {
                     pdf.addPage();
                     y = margin.top + 10;
                 }
@@ -452,24 +477,32 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
                 const formattedDate = new Date(signatureDate + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
                 
                 const principalX = margin.left + 50;
-                const teacherX = pageWidth - margin.right - 50;
+                const teacherX = 330 - margin.right - 50;
 
                 if (signatureOption === 'both') {
                     pdf.text('Mengetahui,', principalX, y, { align: 'center' });
-                    pdf.text('Kepala Sekolah', principalX, y + 6, { align: 'center' });
+                    pdf.text('Kepala Sekolah', principalX, y + 4.5, { align: 'center' }); 
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalX, y + 28, { align: 'center' });
+                    const ksName = schoolIdentity.principalName || '.....................................';
+                    pdf.text(ksName, principalX, y + 23, { align: 'center' }); 
+                    const ksW = pdf.getStringUnitWidth(ksName) * 11 / pdf.internal.scaleFactor;
+                    pdf.setLineWidth(0.2);
+                    pdf.line(principalX - ksW/2, y + 23.5, principalX + ksW/2, y + 23.5); 
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalX, y + 34, { align: 'center' });
+                    pdf.text(`NIP. ${schoolIdentity.principalNip || '...................'}`, principalX, y + 27.5, { align: 'center' }); 
                 }
 
                 if (signatureOption === 'teacher' || signatureOption === 'both') {
                     pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, teacherX, y, { align: 'center' });
-                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 6, { align: 'center' });
+                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 4.5, { align: 'center' });
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(teacher.fullName, teacherX, y + 28, { align: 'center' });
+                    const guruName = teacher.fullName || '.....................................';
+                    pdf.text(guruName, teacherX, y + 23, { align: 'center' });
+                    const gW = pdf.getStringUnitWidth(guruName) * 11 / pdf.internal.scaleFactor;
+                    pdf.setLineWidth(0.2);
+                    pdf.line(teacherX - gW/2, y + 23.5, teacherX + gW/2, y + 23.5); 
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${teacher.nip}`, teacherX, y + 34, { align: 'center' });
+                    pdf.text(`NIP. ${teacher.nip || '...................'}`, teacherX, y + 27.5, { align: 'center' });
                 }
             }
             
@@ -577,22 +610,29 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
                     </thead>
                     <tbody className="bg-white">
                         {renderRows.length > 0 ? (
-                            renderRows.map(row => (
-                                <tr key={row.id} className="align-top hover:bg-gray-50">
-                                    {row.materialRowSpan && row.materialRowSpan > 0 ? (
-                                        <td className="p-1 border text-center align-middle w-[15%]" rowSpan={row.materialRowSpan}>
-                                            <WrappingTextarea value={row.material} onChange={() => {}} disabled={true} className="text-center font-medium" />
+                            renderRows.map(row => {
+                                const cleanTp = row.learningGoalPathway.replace(/^[0-9\.\-\s•]+/, '').trim();
+                                return (
+                                    <tr key={row.id} className="align-top hover:bg-gray-50">
+                                        {row.materialRowSpan && row.materialRowSpan > 0 ? (
+                                            <td className="p-1 border text-center align-middle w-[15%]" rowSpan={row.materialRowSpan}>
+                                                <WrappingTextarea value={row.material} onChange={() => {}} disabled={true} className="text-center font-medium" />
+                                            </td>
+                                        ) : null}
+                                        <td className="p-1 border align-middle w-[25%]">
+                                            <div className="flex items-start p-2">
+                                                {/* COMMENT: Replaced numbering with bullet point in UI */}
+                                                <span className="shrink-0 w-6 font-semibold text-center">•</span>
+                                                <span className="flex-1">{cleanTp}</span>
+                                            </div>
                                         </td>
-                                    ) : null}
-                                    <td className="p-1 border align-middle w-[25%]">
-                                        <WrappingTextarea value={row.learningGoalPathway} onChange={() => {}} disabled={true} />
-                                    </td>
-                                    <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.belumTercapai} onChange={e => handleKktpChange(row.id, 'belumTercapai', e.target.value)} disabled={!isEditing} /></td>
-                                    <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.tercapaiSebagian} onChange={e => handleKktpChange(row.id, 'tercapaiSebagian', e.target.value)} disabled={!isEditing} /></td>
-                                    <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.tuntas} onChange={e => handleKktpChange(row.id, 'tuntas', e.target.value)} disabled={!isEditing} /></td>
-                                    <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.tuntasPlus} onChange={e => handleKktpChange(row.id, 'tuntasPlus', e.target.value)} disabled={!isEditing} /></td>
-                                </tr>
-                            ))
+                                        <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.belumTercapai} onChange={e => handleKktpChange(row.id, 'belumTercapai', e.target.value)} disabled={!isEditing} /></td>
+                                        <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.tercapaiSebagian} onChange={e => handleKktpChange(row.id, 'tercapaiSebagian', e.target.value)} disabled={!isEditing} /></td>
+                                        <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.tuntas} onChange={e => handleKktpChange(row.id, 'tuntas', e.target.value)} disabled={!isEditing} /></td>
+                                        <td className="p-1 border w-[15%]"><WrappingTextarea value={row.kktp.tuntasPlus} onChange={e => handleKktpChange(row.id, 'tuntasPlus', e.target.value)} disabled={!isEditing} /></td>
+                                    </tr>
+                                )
+                            })
                         ) : (
                             <tr><td colSpan={6} className="text-center py-10 text-gray-500 border">Data ATP belum diisi untuk mata pelajaran dan semester ini.</td></tr>
                         )}

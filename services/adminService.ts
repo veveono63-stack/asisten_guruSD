@@ -1,8 +1,6 @@
 
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch, addDoc, deleteDoc, WriteBatch } from 'firebase/firestore';
 import { db } from '../firebase/config';
-/* COMMENT: Fixed incorrect type import name 'GuidanceCounselingBook' to 'GuidanceCounselingData' */
-/* COMMENT: Removed duplicate import of LearningOutcomeItem on line 5 */
 import { SchoolIdentity, Student, Subject, Teacher, User, UserStatus, AcademicEvent, ClassStructure, ClassScheduleData, PiketScheduleData, ClassAgreementData, SeatingChartData, InventoryListData, InventoryItem, StudentSavingsData, StudentSavings, SavingsTransaction, SupervisionLogData, SupervisionLogEntry, MeetingMinutesData, GuidanceCounselingData, LearningOutcomeElement, LearningOutcomesData, LearningOutcomeItem, LearningObjectiveItem, ATPData, KKTPData, KKTPAchievementLevels, KKTPIntervals, ATPRow, KKTPRow, ProtaData, ProtaRow, ProsemData, ProsemRow, ProsemBulanCheckboxes, ModulAjar, ModulAjarData, KokurikulerTheme, KokurikulerActivity, KokurikulerPlanning, ExtracurricularData, ExtracurricularActivity } from '../types';
 import { Type } from '@google/genai';
 import { generateContentWithRotation } from './geminiService';
@@ -59,10 +57,6 @@ export const updateUserStatus = async (userId: string, status: UserStatus): Prom
     }
 };
 
-/**
- * Menghapus pengguna dan melakukan pembersihan data secara menyeluruh (Deep Clean).
- * Menggunakan Multi-Batch untuk menghindari limit 500 operasi Firestore.
- */
 export const deleteUser = async (userId: string, username: string): Promise<void> => {
     try {
         const userDocRef = doc(db, 'users', userId);
@@ -88,7 +82,6 @@ export const deleteUser = async (userId: string, username: string): Promise<void
             }
         };
 
-        // 1. Hapus Dokumen Identitas Utama
         currentBatch.delete(userDocRef);
         operationCount++;
         currentBatch.delete(doc(db, 'usernames', username.toLowerCase()));
@@ -96,12 +89,10 @@ export const deleteUser = async (userId: string, username: string): Promise<void
         currentBatch.delete(doc(db, `teachersData/${userId}/schoolData`, 'identity'));
         operationCount++;
 
-        // 2. Iterasi Tahun Ajaran
         for (const yearId of years) {
             const yearPath = `teachersData/${userId}/schoolData/${yearId}`;
             const classPath = `${yearPath}/${classDocId}`;
 
-            // Hapus Administrasi Umum Kelas
             const adminDocs = [
                 'studentList', 'teacherProfile', 'classStructure', 'classSchedule', 
                 'piketSchedule', 'classAgreement', 'seatingChart', 'inventoryList', 'studentSavings'
@@ -123,17 +114,15 @@ export const deleteUser = async (userId: string, username: string): Promise<void
                 await commitIfFull();
             }
 
-            // 3. Hapus Perangkat Pembelajaran (dengan pengamanan ekstra)
             try {
                 const subjectsRef = collection(db, classPath, 'data', 'subjects');
                 const subSnap = await getDocs(subjectsRef);
                 
                 for (const subDoc of subSnap.docs) {
                     const subId = subDoc.id;
-                    
-                    currentBatch.delete(doc(db, yearPath, phaseDocId, 'data', 'subjects', subId, 'learningOutcomes', 'main'));
+                    currentBatch.delete(doc(db, classPath, 'data', 'subjects', subId, 'learningOutcomes', 'main'));
                     operationCount++;
-                    currentBatch.delete(doc(db, yearPath, phaseDocId, 'data', 'subjects', subId, 'learningObjectives', 'main'));
+                    currentBatch.delete(doc(db, classPath, 'data', 'subjects', subId, 'learningObjectives', 'main'));
                     operationCount++;
                     await commitIfFull();
 
@@ -160,7 +149,6 @@ export const deleteUser = async (userId: string, username: string): Promise<void
                 console.warn(`Folder data untuk tahun ${yearId} tidak ditemukan atau kosong.`);
             }
 
-            // Hapus Program Kokurikuler
             for (const sem of semesters) {
                 currentBatch.delete(doc(db, yearPath, phaseDocId, 'data', 'programKokurikuler', sem));
                 operationCount++;
@@ -171,8 +159,6 @@ export const deleteUser = async (userId: string, username: string): Promise<void
         if (operationCount > 0) {
             await currentBatch.commit();
         }
-        
-        console.log(`Deep Clean user ${userId} selesai.`);
     } catch (error: any) {
         console.error("Deep delete failure:", error);
         throw new Error(error.message || "Gagal menghapus seluruh data guru.");
@@ -189,7 +175,6 @@ export const getSchoolIdentity = async (userId?: string): Promise<SchoolIdentity
         }
         return null;
     } catch (error) {
-        console.error("Firestore getSchoolIdentity Error:", error);
         throw new Error("Gagal mengambil data identitas sekolah.");
     }
 };
@@ -198,8 +183,6 @@ export const updateSchoolIdentity = async (data: SchoolIdentity, userId?: string
     try {
         const docRef = doc(db, getPathRoot(userId), 'identity');
         await setDoc(docRef, data, { merge: true });
-
-        // SINKRONISASI: Jika userId ada, perbarui kolom schoolName di profil user utama
         if (userId) {
             const userRef = doc(db, 'users', userId);
             await updateDoc(userRef, { schoolName: data.schoolName });
@@ -216,13 +199,11 @@ export const getTeacherProfile = async (academicYear: string, classLevel: string
         const classDocId = getClassDocId(classLevel);
         const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'teacherProfile');
         const docSnap = await getDoc(docRef);
-
         if (docSnap.exists()) {
             return { id: docSnap.id, ...docSnap.data() } as Teacher;
         }
         return { id: 'blank', fullName: '', nip: '', nuptk: '', position: `Guru ${classLevel}` } as any;
     } catch (error) {
-        console.error("Firestore getTeacherProfile Error:", error);
         throw new Error("Gagal mengambil data profil guru.");
     }
 };
@@ -274,29 +255,21 @@ export const deleteSubject = async (academicYear: string, classLevel: string, su
     await deleteDoc(docRef);
 };
 
-// --- Fungsi Khusus: Tarik Mata Pelajaran dari Induk ---
 export const pullSubjectsToTeacher = async (academicYear: string, classLevel: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
-    
     const adminSubjectsRef = collection(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects');
     const adminSnap = await getDocs(adminSubjectsRef);
-    
-    if (adminSnap.empty) {
-        throw new Error("Daftar pelajaran di induk admin belum diisi untuk kelas ini.");
-    }
-    
+    if (adminSnap.empty) throw new Error("Daftar pelajaran di induk admin belum diisi untuk kelas ini.");
     const batch = writeBatch(db);
     const pulledSubjects: Subject[] = [];
-
     adminSnap.forEach(docSnap => {
         const data = docSnap.data();
         const teacherSubRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'subjects', docSnap.id);
         batch.set(teacherSubRef, data);
         pulledSubjects.push({ id: docSnap.id, ...data } as Subject);
     });
-    
     await batch.commit();
     return pulledSubjects;
 };
@@ -345,14 +318,11 @@ export const saveCalendarEvents = async (academicYear: string, events: AcademicE
     await setDoc(docRef, { events });
 };
 
-// --- Fungsi Khusus Kalender: Tarik Kalender dari Induk ---
 export const pullCalendarDataToTeacher = async (academicYear: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const rootPath = getPathRoot(userId);
-    
     const adminRef = doc(db, 'schoolData', yearDocId, 'calendarData', 'events');
     const adminSnap = await getDoc(adminRef);
-    
     if (adminSnap.exists()) {
         const teacherCalRef = doc(db, rootPath, yearDocId, 'calendarData', 'events');
         await setDoc(teacherCalRef, adminSnap.data());
@@ -362,7 +332,98 @@ export const pullCalendarDataToTeacher = async (academicYear: string, userId: st
     }
 };
 
-// --- Struktur Organisasi ---
+// --- Perencanaan Pembelajaran (CP & TP) ---
+// Diperbarui agar mendukung penyimpanan per KELAS dengan fallback ke FASE
+export const getLearningOutcomes = async (academicYear: string, classLevel: string, subjectId: string, userId?: string): Promise<LearningOutcomesData> => {
+    const yearDocId = getAcademicYearDocId(academicYear);
+    const classDocId = getClassDocId(classLevel);
+    const root = getPathRoot(userId);
+    
+    // 1. Coba ambil dari path per Kelas (Struktur Baru)
+    const classDocRef = doc(db, root, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    const classSnap = await getDoc(classDocRef);
+    if (classSnap.exists()) return classSnap.data() as LearningOutcomesData;
+
+    // 2. Fallback: Ambil dari path per Fase (Struktur Lama/Data Awal)
+    const phaseDocId = getPhaseDocId(classLevel);
+    const phaseDocRef = doc(db, root, yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    const phaseSnap = await getDoc(phaseDocRef);
+    if (phaseSnap.exists()) return phaseSnap.data() as LearningOutcomesData;
+
+    return { elements: [] };
+};
+
+export const updateLearningOutcomes = async (academicYear: string, classLevel: string, subjectId: string, data: LearningOutcomesData, userId?: string): Promise<void> => {
+    const yearDocId = getAcademicYearDocId(academicYear);
+    const classDocId = getClassDocId(classLevel);
+    // Simpan HANYA ke path per Kelas
+    const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    await setDoc(docRef, data);
+};
+
+export const pullLearningOutcomesToTeacher = async (academicYear: string, classLevel: string, subjectId: string, userId: string) => {
+    const yearDocId = getAcademicYearDocId(academicYear);
+    const phaseDocId = getPhaseDocId(classLevel);
+    const classDocId = getClassDocId(classLevel);
+    
+    // Admin Master tetap di level Fase untuk efisiensi input admin
+    const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    const adminSnap = await getDoc(adminRef);
+    
+    if (!adminSnap.exists()) throw new Error("Data Capaian Pembelajaran di induk admin belum diisi untuk fase ini.");
+    
+    // Simpan ke Guru di path per KELAS
+    const teacherRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    await setDoc(teacherRef, adminSnap.data());
+    return adminSnap.data() as LearningOutcomesData;
+};
+
+export const getLearningObjectives = async (academicYear: string, classLevel: string, subjectId: string, userId?: string): Promise<LearningOutcomesData> => {
+    const cpData = await getLearningOutcomes(academicYear, classLevel, subjectId, userId);
+    const yearDocId = getAcademicYearDocId(academicYear);
+    const classDocId = getClassDocId(classLevel);
+    const root = getPathRoot(userId);
+    
+    // 1. Coba path Kelas
+    const classRef = doc(db, root, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+    let docSnap = await getDoc(classRef);
+    
+    // 2. Fallback path Fase
+    if (!docSnap.exists()) {
+        const phaseDocId = getPhaseDocId(classLevel);
+        const phaseRef = doc(db, root, yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+        docSnap = await getDoc(phaseRef);
+    }
+
+    let objectivesMap = docSnap.exists() ? docSnap.data().objectivesMap || {} : {};
+    const mergedElements = cpData.elements.map(el => ({
+        ...el, outcomes: el.outcomes.map(cp => ({ ...cp, objectives: objectivesMap[cp.id] || [] }))
+    }));
+    return { elements: mergedElements };
+};
+
+export const updateLearningObjectives = async (academicYear: string, classLevel: string, subjectId: string, data: LearningOutcomesData, userId?: string): Promise<void> => {
+    const yearDocId = getAcademicYearDocId(academicYear);
+    const classDocId = getClassDocId(classLevel);
+    const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+    const objectivesMap: any = {};
+    data.elements.forEach(el => el.outcomes.forEach(cp => { if (cp.objectives) objectivesMap[cp.id] = cp.objectives; }));
+    await setDoc(docRef, { objectivesMap });
+};
+
+export const pullLearningObjectivesToTeacher = async (academicYear: string, classLevel: string, subjectId: string, userId: string) => {
+    const yearDocId = getAcademicYearDocId(academicYear);
+    const phaseDocId = getPhaseDocId(classLevel);
+    const classDocId = getClassDocId(classLevel);
+    const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+    const adminSnap = await getDoc(adminRef);
+    if (!adminSnap.exists()) throw new Error("Data Tujuan Pembelajaran di induk admin belum diisi untuk fase ini.");
+    const teacherRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+    await setDoc(teacherRef, adminSnap.data());
+    return adminSnap.data();
+};
+
+// --- Other Data Functions (Struktur Organisasi, Jadwal, etc.) ---
 export const getClassStructure = async (academicYear: string, classLevel: string, userId?: string): Promise<ClassStructure> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
@@ -383,7 +444,6 @@ export const updateClassStructure = async (academicYear: string, classLevel: str
     await setDoc(docRef, data);
 };
 
-// --- Jadwal Pelajaran ---
 export const getClassSchedule = async (academicYear: string, classLevel: string, userId?: string): Promise<ClassScheduleData> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
@@ -404,15 +464,12 @@ export const updateClassSchedule = async (academicYear: string, classLevel: stri
     await setDoc(docRef, data);
 };
 
-// --- Fungsi Khusus Jadwal: Tarik Jadwal dari Induk ---
 export const pullClassScheduleToTeacher = async (academicYear: string, classLevel: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
-    
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'classSchedule');
     const adminSnap = await getDoc(adminRef);
-    
     if (adminSnap.exists()) {
         const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'classSchedule');
         await setDoc(teacherRef, adminSnap.data());
@@ -422,7 +479,6 @@ export const pullClassScheduleToTeacher = async (academicYear: string, classLeve
     }
 };
 
-// --- Jadwal Piket ---
 export const getPiketSchedule = async (academicYear: string, classLevel: string, userId?: string): Promise<PiketScheduleData> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
@@ -443,7 +499,6 @@ export const updatePiketSchedule = async (academicYear: string, classLevel: stri
     await setDoc(docRef, data);
 };
 
-// --- Kesepakatan Kelas ---
 export const getClassAgreement = async (academicYear: string, classLevel: string, userId?: string): Promise<ClassAgreementData> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
@@ -464,15 +519,12 @@ export const updateClassAgreement = async (academicYear: string, classLevel: str
     await setDoc(docRef, data);
 };
 
-// Fungsi Khusus Kesepakatan: Tarik dari Induk
 export const pullClassAgreementToTeacher = async (academicYear: string, classLevel: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
-    
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'classAgreement');
     const adminSnap = await getDoc(adminRef);
-    
     if (adminSnap.exists()) {
         const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'classAgreement');
         await setDoc(teacherRef, adminSnap.data());
@@ -482,7 +534,6 @@ export const pullClassAgreementToTeacher = async (academicYear: string, classLev
     }
 };
 
-// --- Denah Tempat Duduk ---
 export const getSeatingChart = async (academicYear: string, classLevel: string, userId?: string): Promise<SeatingChartData> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
@@ -508,25 +559,14 @@ export const updateSeatingChart = async (academicYear: string, classLevel: strin
     await setDoc(docRef, firestoreCompatibleData);
 };
 
-// --- Inventaris ---
-const defaultInventoryItemsList = [
-    'Papan Tulis', 'Spidol Papan Tulis', 'Penghapus Papan Tulis', 'Meja Guru', 'Kursi Guru',
-    'Meja Siswa', 'Kursi Siswa', 'Lemari Penyimpanan', 'Rak Buku', 'Peta Indonesia',
-    'Peta Dunia', 'Gambar Presiden & Wakil Presiden', 'Lambang Garuda Pancasila', 'Struktur Organisasi Kelas',
-    'Jadwal Piket Kelas', 'Jadwal Pelajaran', 'Sapu Ijuk', 'Sapu Lidi', 'Pengki',
-    'Tempat Sampah', 'Jam Dinding', 'Buku Paket Tematik', 'Kain Pel', 'Ember', 'Pengharum Ruangan'
-];
 export const getInventoryList = async (academicYear: string, classLevel: string, userId?: string): Promise<InventoryListData> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
         const classDocId = getClassDocId(classLevel);
         const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'inventoryList');
         const docSnap = await getDoc(docRef);
-        const defaultItems = defaultInventoryItemsList.map((name, index) => ({
-            id: `default-${index}`, itemName: name, quantity: 0, conditionGood: 0, conditionLightDamage: 0, conditionMediumDamage: 0, conditionHeavyDamage: 0, description: ''
-        }));
         if (docSnap.exists() && docSnap.data().items) return { items: docSnap.data().items };
-        return { items: defaultItems };
+        return { items: [] };
     } catch (error) {
         return { items: [] };
     }
@@ -539,7 +579,6 @@ export const updateInventoryList = async (academicYear: string, classLevel: stri
     await setDoc(docRef, data);
 };
 
-// --- Tabungan Siswa ---
 export const getStudentSavings = async (academicYear: string, classLevel: string, userId?: string): Promise<StudentSavingsData> => {
     try {
         const yearDocId = getAcademicYearDocId(academicYear);
@@ -560,7 +599,6 @@ export const updateStudentSavings = async (academicYear: string, classLevel: str
     await setDoc(docRef, data);
 };
 
-// --- Supervisi & Notulen ---
 export const getSupervisionLog = async (academicYear: string, classLevel: string, semester: string, userId?: string): Promise<SupervisionLogData> => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
@@ -615,80 +653,6 @@ export const updateExtracurricularData = async (academicYear: string, classLevel
     }
 };
 
-// --- Perencanaan Pembelajaran ---
-export const getLearningOutcomes = async (academicYear: string, classLevel: string, subjectId: string, userId?: string): Promise<LearningOutcomesData> => {
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
-    const docRef = doc(db, getPathRoot(userId), yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) return docSnap.data() as LearningOutcomesData;
-    return { elements: [] };
-};
-
-export const updateLearningOutcomes = async (academicYear: string, classLevel: string, subjectId: string, data: LearningOutcomesData, userId?: string): Promise<void> => {
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
-    const docRef = doc(db, getPathRoot(userId), yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
-    await setDoc(docRef, data);
-};
-
-// Fungsi Khusus: Tarik CP dari Induk
-export const pullLearningOutcomesToTeacher = async (academicYear: string, classLevel: string, subjectId: string, userId: string) => {
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
-    
-    const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
-    const adminSnap = await getDoc(adminRef);
-    
-    if (!adminSnap.exists()) {
-        throw new Error("Data Capaian Pembelajaran di induk admin belum diisi untuk mata pelajaran ini.");
-    }
-    
-    const teacherRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
-    await setDoc(teacherRef, adminSnap.data());
-    return adminSnap.data() as LearningOutcomesData;
-};
-
-export const getLearningObjectives = async (academicYear: string, classLevel: string, subjectId: string, userId?: string): Promise<LearningOutcomesData> => {
-    const cpData = await getLearningOutcomes(academicYear, classLevel, subjectId, userId);
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
-    const docRef = doc(db, getPathRoot(userId), yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
-    const docSnap = await getDoc(docRef);
-    let objectivesMap = docSnap.exists() ? docSnap.data().objectivesMap || {} : {};
-    
-    const mergedElements = cpData.elements.map(el => ({
-        ...el, outcomes: el.outcomes.map(cp => ({ ...cp, objectives: objectivesMap[cp.id] || [] }))
-    }));
-    return { elements: mergedElements };
-};
-
-export const updateLearningObjectives = async (academicYear: string, classLevel: string, subjectId: string, data: LearningOutcomesData, userId?: string): Promise<void> => {
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
-    const docRef = doc(db, getPathRoot(userId), yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
-    const objectivesMap: any = {};
-    data.elements.forEach(el => el.outcomes.forEach(cp => { if (cp.objectives) objectivesMap[cp.id] = cp.objectives; }));
-    await setDoc(docRef, { objectivesMap });
-};
-
-// Fungsi Khusus: Tarik TP dari Induk
-export const pullLearningObjectivesToTeacher = async (academicYear: string, classLevel: string, subjectId: string, userId: string) => {
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
-    
-    const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
-    const adminSnap = await getDoc(adminRef);
-    
-    if (!adminSnap.exists()) {
-        throw new Error("Data Tujuan Pembelajaran di induk admin belum diisi untuk mata pelajaran ini.");
-    }
-    
-    const teacherRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
-    await setDoc(teacherRef, adminSnap.data());
-    return adminSnap.data(); // Contains objectivesMap
-};
-
 export const getATPData = async (academicYear: string, classLevel: string, subjectCode: string, semester: string, userId?: string): Promise<ATPData> => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
@@ -707,20 +671,16 @@ export const updateATPData = async (academicYear: string, classLevel: string, su
     await setDoc(docRef, data);
 };
 
-// Fungsi Khusus: Tarik ATP dari Induk
 export const pullATPDataToTeacher = async (academicYear: string, classLevel: string, subjectCode: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
-    
     const semesters = ['Ganjil', 'Genap'];
     const results = { ganjil: { rows: [] } as ATPData, genap: { rows: [] } as ATPData };
-
     for (const sem of semesters) {
         const docId = `${subjectCode}_${sem.toLowerCase()}`;
         const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'atp', docId);
         const adminSnap = await getDoc(adminRef);
-        
         if (adminSnap.exists()) {
             const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'atp', docId);
             await setDoc(teacherRef, adminSnap.data());
@@ -728,11 +688,7 @@ export const pullATPDataToTeacher = async (academicYear: string, classLevel: str
             else results.genap = adminSnap.data() as ATPData;
         }
     }
-    
-    if (results.ganjil.rows.length === 0 && results.genap.rows.length === 0) {
-        throw new Error("Data Alur Tujuan Pembelajaran di induk admin belum diisi untuk mata pelajaran ini.");
-    }
-    
+    if (results.ganjil.rows.length === 0 && results.genap.rows.length === 0) throw new Error("Data Alur Tujuan Pembelajaran di induk admin belum diisi untuk mata pelajaran ini.");
     return results;
 };
 
@@ -744,10 +700,8 @@ export const getKKTP = async (academicYear: string, classLevel: string, subjectC
     const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'kktp', docId);
     const docSnap = await getDoc(docRef);
     const defaultIntervals = { interval1: '< 60', interval2: '60 - 72', interval3: '73 - 86', interval4: '87 - 100' };
-    
     let intervals = docSnap.exists() ? docSnap.data().intervals || defaultIntervals : defaultIntervals;
     let kktpMap = docSnap.exists() ? docSnap.data().kktpMap || {} : {};
-    
     const flattenedRows: KKTPRow[] = [];
     atpData.rows.forEach(atpRow => {
         const atpLines = atpRow.learningGoalPathway.split('\n').filter(line => line.trim() !== '');
@@ -769,20 +723,14 @@ export const updateKKTP = async (academicYear: string, classLevel: string, subje
     await setDoc(docRef, { intervals: data.intervals, kktpMap });
 };
 
-// Fungsi Khusus: Tarik KKTP dari Induk
 export const pullKKTPToTeacher = async (academicYear: string, classLevel: string, subjectCode: string, semester: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
     const docId = `${subjectCode}_${semester.toLowerCase()}`;
-    
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'kktp', docId);
     const adminSnap = await getDoc(adminRef);
-    
-    if (!adminSnap.exists()) {
-        throw new Error("Data KKTP di induk admin belum diisi untuk mata pelajaran dan semester ini.");
-    }
-    
+    if (!adminSnap.exists()) throw new Error("Data KKTP di induk admin belum diisi untuk mata pelajaran dan semester ini.");
     const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'kktp', docId);
     await setDoc(teacherRef, adminSnap.data());
     return adminSnap.data() as KKTPData;
@@ -796,7 +744,6 @@ export const getProta = async (academicYear: string, classLevel: string, subject
     const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'prota', subjectCode);
     const docSnap = await getDoc(docRef);
     let alokasiWaktuMap = docSnap.exists() ? docSnap.data().alokasiWaktuMap || {} : {};
-    
     const protaGanjilRows = atpGanjil.rows.map(r => ({ ...r, alokasiWaktu: alokasiWaktuMap[r.id] || 0 }));
     const protaGenapRows = atpGenap.rows.map(r => ({ ...r, alokasiWaktu: alokasiWaktuMap[r.id] || 0 }));
     return { ganjilRows: protaGanjilRows as any, genapRows: protaGenapRows as any };
@@ -811,22 +758,16 @@ export const updateProta = async (academicYear: string, classLevel: string, subj
     await setDoc(docRef, { alokasiWaktuMap });
 };
 
-// Fungsi Khusus: Tarik PROTA dari Induk
 export const pullProtaToTeacher = async (academicYear: string, classLevel: string, subjectCode: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
-    
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'prota', subjectCode);
     const adminSnap = await getDoc(adminRef);
-    
-    if (!adminSnap.exists()) {
-        throw new Error("Data alokasi waktu PROTA di induk admin belum diisi untuk mata pelajaran ini.");
-    }
-    
+    if (!adminSnap.exists()) throw new Error("Data alokasi waktu PROTA di induk admin belum diisi untuk mata pelajaran ini.");
     const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'prota', subjectCode);
     await setDoc(teacherRef, adminSnap.data());
-    return adminSnap.data(); // Contains alokasiWaktuMap
+    return adminSnap.data();
 };
 
 export const getProsem = async (academicYear: string, classLevel: string, subjectCode: string, semester: 'Ganjil' | 'Genap', userId?: string): Promise<ProsemData> => {
@@ -838,7 +779,6 @@ export const getProsem = async (academicYear: string, classLevel: string, subjec
     const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'prosem', docId);
     const docSnap = await getDoc(docRef);
     let storedData = docSnap.exists() ? docSnap.data() : {};
-    
     const prosemRows: ProsemRow[] = [];
     protaRowsForSemester.forEach(protaRow => {
         const lingkupMateriLines = (protaRow.materialScope || '').split('\n').filter(line => line.trim() !== '');
@@ -861,26 +801,19 @@ export const updateProsem = async (academicYear: string, classLevel: string, sub
     await setDoc(docRef, dataToStore);
 };
 
-// Fungsi Khusus: Tarik PROSEM dari Induk
 export const pullProsemToTeacher = async (academicYear: string, classLevel: string, subjectCode: string, semester: 'Ganjil' | 'Genap', userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
     const docId = `${subjectCode}_${semester.toLowerCase()}`;
-    
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'prosem', docId);
     const adminSnap = await getDoc(adminRef);
-    
-    if (!adminSnap.exists()) {
-        throw new Error("Data PROSEM di induk admin belum diisi untuk mata pelajaran dan semester ini.");
-    }
-    
+    if (!adminSnap.exists()) throw new Error("Data PROSEM di induk admin belum diisi untuk mata pelajaran dan semester ini.");
     const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'prosem', docId);
     await setDoc(teacherRef, adminSnap.data());
     return adminSnap.data();
 };
 
-// --- Modul Ajar ---
 export const getModulAjar = async (academicYear: string, classLevel: string, subjectCode: string, semester: 'Ganjil' | 'Genap', userId?: string): Promise<ModulAjarData> => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
@@ -899,20 +832,14 @@ export const updateModulAjar = async (academicYear: string, classLevel: string, 
     await setDoc(docRef, data);
 };
 
-// Fungsi Khusus: Tarik MODUL AJAR dari Induk
 export const pullModulAjarToTeacher = async (academicYear: string, classLevel: string, subjectCode: string, semester: 'Ganjil' | 'Genap', userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
     const docId = `${subjectCode}_${semester.toLowerCase()}`;
-    
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'modulAjar', docId);
     const adminSnap = await getDoc(adminRef);
-    
-    if (!adminSnap.exists()) {
-        throw new Error("Data Modul Ajar di induk admin belum diisi untuk mata pelajaran dan semester ini.");
-    }
-    
+    if (!adminSnap.exists()) throw new Error("Data Modul Ajar di induk admin belum diisi untuk mata pelajaran dan semester ini.");
     const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'modulAjar', docId);
     await setDoc(teacherRef, adminSnap.data());
     return adminSnap.data() as ModulAjarData;
@@ -966,116 +893,15 @@ export const updateKokurikulerPlanning = async (academicYear: string, classLevel
     await setDoc(docRef, { planning }, { merge: true });
 };
 
-// Fungsi Khusus: Tarik KOKURIKULER dari Induk
 export const pullKokurikulerToTeacher = async (academicYear: string, classLevel: string, semester: 'Ganjil' | 'Genap', userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const phaseDocId = getPhaseDocId(classLevel);
     const rootPath = getPathRoot(userId);
     const sem = semester.toLowerCase();
-
     const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'programKokurikuler', sem);
     const adminSnap = await getDoc(adminRef);
-
-    if (!adminSnap.exists()) {
-        throw new Error("Data Program Kokurikuler di induk admin belum diisi untuk semester ini.");
-    }
-
+    if (!adminSnap.exists()) throw new Error("Data Program Kokurikuler di induk admin belum diisi untuk semester ini.");
     const teacherRef = doc(db, rootPath, yearDocId, phaseDocId, 'data', 'programKokurikuler', sem);
     await setDoc(teacherRef, adminSnap.data());
     return adminSnap.data();
-};
-
-// --- FUNGSI KHUSUS: Tarik Data dari Induk (Admin) ke Guru ---
-export const pullMasterDataToTeacher = async (academicYear: string, classLevel: string, userId: string, onProgress: (msg: string) => void) => {
-    const yearDocId = getAcademicYearDocId(academicYear);
-    const classDocId = getClassDocId(classLevel);
-    const phaseDocId = getPhaseDocId(classLevel);
-    const rootPath = getPathRoot(userId);
-
-    onProgress('Menarik Kalender Pendidikan...');
-    const adminCalRef = doc(db, 'schoolData', yearDocId, 'calendarData', 'events');
-    const adminCalSnap = await getDoc(adminCalRef);
-    if (adminCalSnap.exists()) {
-        await setDoc(doc(db, rootPath, yearDocId, 'calendarData', 'events'), adminCalSnap.data());
-    }
-
-    onProgress('Mengambil daftar mata pelajaran...');
-    const subjects = await getSubjects(academicYear, classLevel);
-    
-    for (const subj of subjects) {
-        onProgress(`Menarik CP & TP: ${subj.name}...`);
-        const subjId = subj.code.toLowerCase();
-        const adminCpRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjId, 'learningOutcomes', 'main');
-        const adminCpSnap = await getDoc(adminCpRef);
-        if (adminCpSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, phaseDocId, 'data', 'subjects', subjId, 'learningOutcomes', 'main'), adminCpSnap.data());
-        const adminTpRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjId, 'learningObjectives', 'main');
-        const adminTpSnap = await getDoc(adminTpRef);
-        if (adminTpSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, phaseDocId, 'data', 'subjects', subjId, 'learningObjectives', 'main'), adminTpSnap.data());
-    }
-
-    const semesters = ['ganjil', 'genap'];
-    for (const subj of subjects) {
-        const subjId = subj.code.toLowerCase();
-        for (const sem of semesters) {
-            onProgress(`Menarik ATP & Prosem: ${subj.name} (${sem})...`);
-            const adminAtpRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'atp', `${subjId}_${sem}`);
-            const adminAtpSnap = await getDoc(adminAtpRef);
-            if (adminAtpSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, classDocId, 'data', 'atp', `${subjId}_${sem}`), adminAtpSnap.data());
-            const adminKktpRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'kktp', `${subjId}_${sem}`);
-            const adminKktpSnap = await getDoc(adminKktpRef);
-            if (adminKktpSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, classDocId, 'data', 'kktp', `${subjId}_${sem}`), adminKktpSnap.data());
-            const adminPsRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'prosem', `${subjId}_${sem}`);
-            const adminPsSnap = await getDoc(adminPsRef);
-            if (adminPsSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, classDocId, 'data', 'prosem', `${subjId}_${sem}`), adminPsSnap.data());
-        }
-        onProgress(`Menarik PROTA: ${subj.name}...`);
-        const adminProtaRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'prota', subjId);
-        const adminProtaSnap = await getDoc(adminProtaRef);
-        if (adminProtaSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, classDocId, 'data', 'prota', subjId), adminProtaSnap.data());
-    }
-
-    for (const sem of semesters) {
-        onProgress(`Menarik Program Kokurikuler (${sem})...`);
-        const adminKoRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'programKokurikuler', sem);
-        const adminKoSnap = await getDoc(adminKoRef);
-        if (adminKoSnap.exists()) await setDoc(doc(db, rootPath, yearDocId, phaseDocId, 'data', 'programKokurikuler', sem), adminKoSnap.data());
-    }
-    onProgress('Sinkronisasi selesai!');
-};
-
-export const generateBulkKktpForAll = async (academicYear: string, onProgress: (message: string) => void): Promise<{ success: boolean; message: string }> => {
-    onProgress('Memulai proses...');
-    const classLevels = ['Kelas I', 'Kelas II', 'Kelas III', 'Kelas IV', 'Kelas V', 'Kelas VI'];
-    try {
-        for (const classLevel of classLevels) {
-            const subjects = await getSubjects(academicYear, classLevel);
-            for (const subject of subjects) {
-                const subjectId = subject.code.toLowerCase();
-                const semesters: ('Ganjil' | 'Genap')[] = ['Ganjil', 'Genap'];
-                for (const semester of semesters) {
-                    onProgress(`Memproses ${subject.name} - ${classLevel} - Semester ${semester}...`);
-                    const kktpData = await getKKTP(academicYear, classLevel, subjectId, semester);
-                    const atpsToGenerate = kktpData.rows.filter(row => row.learningGoalPathway.trim());
-                    if (atpsToGenerate.length === 0) continue;
-                    const prompt = `Buatkan deskripsi KKTP untuk: ${atpsToGenerate.map(row => `- ID: "${row.id}", ATP: "${row.learningGoalPathway}"`).join('\n')}`;
-                    try {
-                        const response = await generateContentWithRotation({
-                            model: 'gemini-3-flash-preview',
-                            contents: prompt,
-                            config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { id: { type: Type.STRING }, kktp: { type: Type.OBJECT, properties: { belumTercapai: { type: Type.STRING }, tercapaiSebagian: { type: Type.STRING }, tuntas: { type: Type.STRING }, tuntasPlus: { type: Type.STRING } } } } } } },
-                        });
-                        const results = JSON.parse(response.text.trim());
-                        const updatedRows = kktpData.rows.map(row => {
-                            const res = results.find((r:any) => r.id === row.id);
-                            return res ? { ...row, kktp: res.kktp } : row;
-                        });
-                        await updateKKTP(academicYear, classLevel, subjectId, semester, { ...kktpData, rows: updatedRows });
-                    } catch (e) {}
-                }
-            }
-        }
-        return { success: true, message: 'Proses generate KKTP massal selesai.' };
-    } catch (error: any) {
-        return { success: false, message: `Proses gagal: ${error.message}` };
-    }
 };

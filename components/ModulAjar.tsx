@@ -482,7 +482,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
             addLabelValue("Materi/Tema", topicData.topic);
             addLabelValue("Kelas/Fase/Semester", `${selectedClass.replace('Kelas ', '')} / ${phase} / ${selectedSemester}`);
             addLabelValue("Tahun Pelajaran", selectedYear); // Positioned above Alokasi Waktu
-            addLabelValue("Alokasi Waktu", `${topicData.totalJp} JP (${topicData.meetingDates.length} Kali Pertemuan)`); // Positioned at the bottom
+            addLabelValue("Alokasi Waktu", `${topicData.totalJp} JP (${topicData.meetingDates.length} Kali Pertemuan)`); // Now at the bottom
             y += 5;
 
             addSectionHeader("A. IDENTIFIKASI PEMBELAJARAN");

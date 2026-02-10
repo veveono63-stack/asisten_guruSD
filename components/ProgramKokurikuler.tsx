@@ -731,6 +731,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
         try {
             await updateKokurikulerPlanning(selectedYear, selectedClass, selectedSemester, planningData, userId);
             setNotification({ message: 'Perencanaan kokurikuler berhasil disimpan.', type: 'success' });
+            // COMMENT: Fixed "Cannot find name 'setIsEditing'" by removing the undefined state call as Tab 3 is always in edit mode
         } catch (error: any) {
             setNotification({ message: error.message, type: 'error' });
         } finally {
@@ -1561,7 +1562,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
                                                             <ArrowDownTrayIcon className="w-4 h-4"/> PDF
                                                         </button>
                                                         {isPdfDropdownOpen && (
-                                                            <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-10" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
+                                                            <div className="absolute left-0 bottom-full mb-2 w-48 bg-white border rounded shadow-lg z-10" onMouseLeave={() => setIsPdfDropdownOpen(false)}>
                                                                 <button onClick={() => handleDownloadTab3PDF('none')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Tanpa TTD</button>
                                                                 <button onClick={() => handleDownloadTab3PDF('teacher')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Wali Kelas</button>
                                                                 <button onClick={() => handleDownloadTab3PDF('both')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">TTD Wali Kelas & KS</button>
@@ -1725,7 +1726,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
             {/* DELETE THEME CONFIRMATION */}
             {themeToDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-sm overflow-hidden p-6">
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Tema?</h3>
                         <p className="text-gray-600 text-sm mb-6">
                             Anda akan menghapus tema <strong>"{themeToDelete.name}"</strong>. 
@@ -1742,7 +1743,7 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
             {/* DELETE ACTIVITY CONFIRMATION */}
             {activityToDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-sm overflow-hidden p-6">
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Kegiatan?</h3>
                         <p className="text-gray-600 text-sm mb-6">
                             Anda akan menghapus kegiatan <strong>"{activityToDelete.name}"</strong> secara permanen.

@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
-import { Subject, LearningOutcomeElement, LearningObjectiveItem, LearningOutcomeItem } from '../types';
+import { Subject, LearningOutcomeElement, LearningObjectiveItem, LearningOutcomeItem, SchoolIdentity, Teacher } from '../types';
 import { getSubjects, getLearningObjectives, updateLearningObjectives, getSchoolIdentity, getTeacherProfile, pullLearningObjectivesToTeacher } from '../services/adminService';
 import Notification, { NotificationType } from './Notification';
 import { PencilIcon, TrashIcon, SparklesIcon, ArrowDownTrayIcon, ArrowPathIcon } from './Icons';
@@ -81,8 +80,8 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
     
     const [elements, setElements] = useState<LearningOutcomeElement[]>([]);
     const [originalElements, setOriginalElements] = useState<LearningOutcomeElement[]>([]);
-    const [schoolIdentity, setSchoolIdentity] = useState<any>(null);
-    const [teacher, setTeacher] = useState<any>(null);
+    const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
+    const [teacher, setTeacher] = useState<Teacher | null>(null);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
@@ -97,7 +96,6 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
 
     const createEmptyObjective = (): LearningObjectiveItem => ({ id: crypto.randomUUID(), text: '' });
     
-    // Effect 1: Fetch subjects for the dropdown and set the initial selection.
     useEffect(() => {
         let isMounted = true;
         const fetchInitialData = async () => {
@@ -163,7 +161,6 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
         return subject ? subject.name : '';
     }, [selectedSubjectId, subjectsForDropdown, activeArtTab]);
 
-    // Effect 2: Fetch the actual learning objectives based on the selected subject/tab.
     useEffect(() => {
         if (!finalSubjectIdForApi) {
             setElements([]);
@@ -304,7 +301,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
                 1. Untuk setiap CP, buat daftar TP yang spesifik dan terukur.
                 2. Setiap TP harus diawali dengan kata kerja operasional (misalnya: menjelaskan, mengidentifikasi, mempraktikkan).
                 3. Pastikan TP merupakan turunan langsung dari CP yang bersangkutan.
-                4. Kembalikan jawaban HANYA dalam format array JSON yang valid, sesuai dengan skema yang diberikan. Setiap objek dalam array harus berisi 'cp_id' dan 'generated_tps'.
+                4. Kembalikan jawaban HANYA dalam format array JSON yang valid, sesuai dengan skema yang diberikan. Setiap objek dalam array harus berisi 'cp_id' and 'generated_tps'.
             `;
     
             const schema = {
@@ -320,7 +317,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             };
     
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3-flash-preview',
                 contents: prompt,
                 config: { responseMimeType: "application/json", responseSchema: schema },
             });
@@ -386,7 +383,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             `;
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3-flash-preview',
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
@@ -431,8 +428,9 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] });
 
-            const margin = { top: 5, left: 25, right: 5, bottom: 5 }; // Custom margins
-            const contentWidth = 215 - margin.left - margin.right;
+            const margin = { top: 5, left: 25, right: 5, bottom: 7 }; 
+            const pageWidth = 215;
+            const contentWidth = pageWidth - margin.left - margin.right;
             const pageHeight = 330;
             let y = margin.top + 10;
 
@@ -440,13 +438,13 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             pdf.setFont('helvetica', 'bold');
             pdf.setFontSize(12);
             pdf.setTextColor(0, 0, 0);
-            pdf.text(`TUJUAN PEMBELAJARAN ${selectedSubjectName.toUpperCase()}`, 107.5, y, { align: 'center' });
+            pdf.text(`TUJUAN PEMBELAJARAN ${String(selectedSubjectName || '').toUpperCase()}`, 107.5, y, { align: 'center' });
             y += 6;
             pdf.setFontSize(11);
             pdf.text(`KELAS ${selectedClass.toUpperCase().replace('KELAS ', '')} TAHUN AJARAN ${selectedYear}`, 107.5, y, { align: 'center' });
             y += 6;
             pdf.setFontSize(10);
-            pdf.text(schoolIdentity.schoolName.toUpperCase(), 107.5, y, { align: 'center' });
+            pdf.text(String(schoolIdentity.schoolName || '').toUpperCase(), 107.5, y, { align: 'center' });
             y += 10;
 
             // Table
@@ -496,45 +494,109 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
                     textColor: 0
                 },
                 columnStyles: {
-                    0: { cellWidth: 40, fontStyle: 'bold' },
-                    1: { cellWidth: 65 },
-                    2: { cellWidth: 80 },
+                    0: { cellWidth: 30, fontStyle: 'bold' }, // Adjusted to 30mm per request
+                    1: { cellWidth: 65 }, // Adjusted from 72.5
+                    2: { cellWidth: 90, cellPadding: { top: 2, right: 5, bottom: 2, left: 2 } }, // Adjusted from 92.5
                 },
-                margin: { left: margin.left, right: margin.right, top: margin.top, bottom: margin.bottom }
+                margin: { left: margin.left, right: margin.right, top: margin.top, bottom: margin.bottom },
+                didDrawCell: (data: any) => {
+                    // Implement hanging indent for Tujuan Pembelajaran column (index 2)
+                    if (data.column.index === 2 && data.section === 'body') {
+                        const doc = data.doc;
+                        const cell = data.cell;
+                        const padding = cell.styles.cellPadding;
+                        
+                        // Robust padding checks for numeric or object
+                        const pLeft = (typeof padding === 'number') ? padding : (padding && typeof padding.left === 'number' ? padding.left : 0);
+                        const pTop = (typeof padding === 'number') ? padding : (padding && typeof padding.top === 'number' ? padding.top : 0);
+                        
+                        const startX = (cell.x || 0) + pLeft;
+                        const scale = doc.internal.scaleFactor || 1;
+                        const fs = doc.getFontSize() || 9;
+                        let currentY = (cell.y || 0) + pTop + (fs / scale * 0.8); 
+                        
+                        const lines = Array.isArray(cell.text) ? cell.text : [cell.text];
+                        if (!lines || lines.length === 0) return;
+
+                        // Clean cell area
+                        doc.setFillColor(cell.styles.fillColor || [255, 255, 255]);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'F');
+                        doc.setDrawColor(cell.styles.lineColor || 0);
+                        doc.setLineWidth(cell.styles.lineWidth || 0.1);
+                        doc.rect(cell.x, cell.y, cell.width, cell.height, 'S');
+
+                        let currentHangingIndent = 0;
+                        const lhFactor = (typeof cell.styles.lineHeight === 'number') ? cell.styles.lineHeight : 1.15;
+                        const lineStep = (fs / scale) * lhFactor;
+
+                        lines.forEach((line: any) => {
+                            const textLine = String(line || '');
+                            const cleanLine = textLine.trim();
+                            if (!cleanLine) { currentY += lineStep; return; }
+
+                            const match = cleanLine.match(/^(\d+[\.\)]|\u2022)\s+/);
+                            if (match) {
+                                const prefix = match[0];
+                                currentHangingIndent = doc.getStringUnitWidth(prefix) * fs / scale;
+                                doc.setFont('helvetica', 'normal');
+                                doc.text(textLine, startX, currentY);
+                            } else {
+                                doc.setFont('helvetica', 'normal');
+                                doc.text(textLine, startX + currentHangingIndent, currentY);
+                            }
+                            currentY += lineStep;
+                        });
+                    }
+                }
             });
 
-            y = (pdf as any).lastAutoTable.finalY + 15;
+            y = (pdf as any).lastAutoTable.finalY + 7; // Minimal gap of 1 line
 
             // Signatures
             if (signatureOption !== 'none') {
-                if (y > pageHeight - 50) {
+                if (y + 40 > pageHeight - margin.bottom) {
                     pdf.addPage();
                     y = margin.top + 10;
                 }
 
                 pdf.setFontSize(11);
-                pdf.setFont('helvetica', 'normal');
                 const formattedDate = new Date(signatureDate + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
                 
                 const principalX = margin.left + (contentWidth / 4);
                 const teacherX = 215 - margin.right - (contentWidth / 4);
 
                 if (signatureOption === 'both') {
-                    pdf.text('Mengetahui,', principalX, y, { align: 'center' });
-                    pdf.text('Kepala Sekolah', principalX, y + 6, { align: 'center' });
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text(schoolIdentity.principalName, principalX, y + 28, { align: 'center' });
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${schoolIdentity.principalNip}`, principalX, y + 34, { align: 'center' });
+                    pdf.text('Mengetahui,', principalX, y, { align: 'center' });
+                    pdf.text('Kepala Sekolah', principalX, y + 4.5, { align: 'center' }); 
+                    
+                    pdf.setFont('helvetica', 'bold');
+                    const principalName = String(schoolIdentity.principalName || '');
+                    pdf.text(principalName, principalX, y + 23, { align: 'center' }); 
+                    // Draw Underline
+                    const pWidth = pdf.getStringUnitWidth(principalName) * 11 / pdf.internal.scaleFactor;
+                    pdf.setLineWidth(0.2);
+                    pdf.line(principalX - pWidth / 2, y + 23.5, principalX + pWidth / 2, y + 23.5);
+
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`NIP. ${String(schoolIdentity.principalNip || '')}`, principalX, y + 27.5, { align: 'center' }); 
                 }
 
                 if (signatureOption === 'teacher' || signatureOption === 'both') {
-                    pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, teacherX, y, { align: 'center' });
-                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 6, { align: 'center' });
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text(teacher.fullName, teacherX, y + 28, { align: 'center' });
                     pdf.setFont('helvetica', 'normal');
-                    pdf.text(`NIP. ${teacher.nip}`, teacherX, y + 34, { align: 'center' });
+                    pdf.text(`${schoolIdentity.city || '...................'}, ${formattedDate}`, teacherX, y, { align: 'center' });
+                    pdf.text(`Wali Kelas ${selectedClass.replace('Kelas ', '')}`, teacherX, y + 4.5, { align: 'center' });
+                    
+                    pdf.setFont('helvetica', 'bold');
+                    const teacherName = String(teacher.fullName || '');
+                    pdf.text(teacherName, teacherX, y + 23, { align: 'center' });
+                    // Draw Underline
+                    const tWidth = pdf.getStringUnitWidth(teacherName) * 11 / pdf.internal.scaleFactor;
+                    pdf.setLineWidth(0.2);
+                    pdf.line(teacherX - tWidth / 2, y + 23.5, teacherX + tWidth / 2, y + 23.5);
+
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`NIP. ${String(teacher.nip || '')}`, teacherX, y + 27.5, { align: 'center' });
                 }
             }
             
@@ -668,7 +730,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
                                                  <button onClick={() => handleGenerateTPForElement(row.elementId)} disabled={isSaving || isAnyGenerationRunning} className="btn-ai-small mt-2">
                                                     {generatingState[row.elementId] ? <LoadingSpinner/> : <SparklesIcon/>}
                                                     <span>Generate TP Elemen Ini</span>
-                                                </button>
+                                                 </button>
                                             )}
                                         </div>
                                     </td>
