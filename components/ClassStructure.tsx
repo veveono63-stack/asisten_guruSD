@@ -6,7 +6,8 @@ import Notification, { NotificationType } from './Notification';
 import { PencilIcon, TrashIcon, ArrowDownTrayIcon, UserPlusIcon } from './Icons';
 import AutocompleteInput from './AutocompleteInput';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface ClassStructureProps {
     selectedClass: string;

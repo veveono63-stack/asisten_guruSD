@@ -5,7 +5,8 @@ import { getStudents, getSchoolIdentity, getTeacherProfile, getSubjects, getLear
 import Notification, { NotificationType } from './Notification';
 import { ArrowDownTrayIcon, PrinterIcon } from './Icons';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface AssessmentAnalysisProps {
     selectedClass: string;
@@ -74,7 +75,7 @@ const AssessmentAnalysis: React.FC<AssessmentAnalysisProps> = ({ selectedClass, 
                 fetchedSubjects.forEach(s => {
                     if (!s.name.toLowerCase().startsWith('seni')) {
                         if (!regularSubjectsMap.has(s.name)) {
-                            regularSubjectsMap.set(s.name, { id: s.code.toLowerCase(), name: s.name });
+                            regularSubjectsMap.set(s.name, { id: s.id, name: s.name });
                         }
                     }
                 });
@@ -156,7 +157,6 @@ const AssessmentAnalysis: React.FC<AssessmentAnalysisProps> = ({ selectedClass, 
         await new Promise(r => setTimeout(r, 100));
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] });
             
             const margin = { top: 15, left: 20, right: 10, bottom: 15 };

@@ -3,7 +3,8 @@ import { Subject, LearningOutcomeElement, LearningObjectiveItem, LearningOutcome
 import { getSubjects, getLearningObjectives, updateLearningObjectives, getSchoolIdentity, getTeacherProfile, pullLearningObjectivesToTeacher } from '../services/adminService';
 import Notification, { NotificationType } from './Notification';
 import { PencilIcon, TrashIcon, SparklesIcon, ArrowDownTrayIcon, ArrowPathIcon } from './Icons';
-import { GoogleGenAI, Type } from '@google/genai';
+import { generateContentWithRotation } from '../services/geminiService';
+import { Type } from '@google/genai';
 
 declare const jspdf: any;
 
@@ -25,6 +26,7 @@ const subjectSortOrder = [
     'bahasa jawa',
     'pendidikan lingkungan hidup',
     'koding dan kecerdasan artifisial',
+    'koding dan kecerdasan artificial',
 ];
 
 const masterArtSubjects = ['Seni Rupa', 'Seni Musik', 'Seni Tari', 'Seni Teater'];
@@ -289,7 +291,6 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
         setNotification({message: "AI sedang membuat Tujuan Pembelajaran, mohon tunggu...", type: 'info'});
     
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
             const promptInput = cpsToGenerate.map(cp => `\n- Elemen: "${cp.elementName}"\n  CP (ID: ${cp.id}): "${cp.text}"`).join('');
             const prompt = `
                 Anda adalah seorang ahli perancangan kurikulum. Berdasarkan daftar Capaian Pembelajaran (CP) berikut, buatkan Tujuan Pembelajaran (TP) yang relevan untuk setiap CP.
@@ -316,7 +317,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
                 }
             };
     
-            const response = await ai.models.generateContent({
+            const response = await generateContentWithRotation({
                 model: 'gemini-3-flash-preview',
                 contents: prompt,
                 config: { responseMimeType: "application/json", responseSchema: schema },
@@ -345,7 +346,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             })));
             setNotification({ message: `Tujuan Pembelajaran untuk ${targetType === 'subject' ? 'seluruh mata pelajaran' : 'elemen ini'} berhasil dibuat oleh AI!`, type: 'success' });
     
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
             setNotification({ message: 'Gagal menghasilkan TP dengan AI. Silakan coba lagi.', type: 'error' });
         } finally {
@@ -371,7 +372,6 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
         setGeneratingState({ [outcomeId]: true });
         setNotification({message: "AI sedang membuat Tujuan Pembelajaran, mohon tunggu...", type: 'info'});
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
             const prompt = `
                 Anda adalah seorang ahli perancangan kurikulum. Berdasarkan Capaian Pembelajaran (CP) berikut, buatlah daftar Tujuan Pembelajaran (TP) yang relevan, spesifik, dan terukur untuk siswa sekolah dasar.
                 Capaian Pembelajaran (CP): "${cpText}"
@@ -382,7 +382,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
                 Format output: Berikan jawaban HANYA dalam format array JSON string yang valid. Contoh: ["Siswa dapat menjelaskan...", "Siswa mampu mengidentifikasi..."]
             `;
 
-            const response = await ai.models.generateContent({
+            const response = await generateContentWithRotation({
                 model: 'gemini-3-flash-preview',
                 contents: prompt,
                 config: {
@@ -404,7 +404,7 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             } else {
                 throw new Error("Format respons AI tidak valid.");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
             setNotification({ message: 'Gagal menghasilkan TP dengan AI. Silakan coba lagi.', type: 'error' });
         } finally {
@@ -602,8 +602,8 @@ const LearningObjectives: React.FC<LearningObjectivesProps> = ({ selectedClass, 
             
             pdf.save(`TP-${selectedSubjectName.replace(/[\s/]/g, '_')}-${selectedClass.replace(' ', '_')}-${selectedYear.replace('/', '-')}.pdf`);
             setNotification({ message: 'PDF berhasil dibuat.', type: 'success' });
-        } catch (e) {
-            console.error(e);
+        } catch (error: any) {
+            console.error(error);
             setNotification({ message: 'Gagal membuat PDF.', type: 'error' });
         } finally {
             setIsGeneratingPDF(false);

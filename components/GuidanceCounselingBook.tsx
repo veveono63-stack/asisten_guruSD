@@ -5,7 +5,8 @@ import { getTeacherProfile, getSchoolIdentity } from '../services/adminService';
 import Notification, { NotificationType } from './Notification';
 import { ArrowDownTrayIcon } from './Icons';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface GuidanceCounselingBookProps {
     selectedClass: string;
@@ -59,7 +60,6 @@ const GuidanceCounselingBook: React.FC<GuidanceCounselingBookProps> = ({ selecte
         await new Promise(r => setTimeout(r, 50));
 
         try {
-            const { jsPDF } = jspdf;
             // F4 Landscape: 330mm x 215mm
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] });
 

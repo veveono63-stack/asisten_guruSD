@@ -38,6 +38,7 @@ import StudentGradesList from './StudentGradesList';
 import AssessmentAnalysis from './AssessmentAnalysis'; 
 import AssessmentKokurikuler from './AssessmentKokurikuler';
 import RemedialEnrichment from './RemedialEnrichment';
+import CoverGenerator from './CoverGenerator';
 import Notification, { NotificationType } from './Notification';
 
 import { 
@@ -118,6 +119,13 @@ const teacherMenuCategories = [
             { key: 'analisis-hasil', label: 'Analisis Hasil Penilaian' },
             { key: 'penilaian-kokurikuler', label: 'Penilaian Kokurikuler' },
             { key: 'remedial-pengayaan', label: 'Remedial / Pengayaan' },
+        ],
+    },
+    {
+        category: 'SAMPUL & COVER',
+        icon: <ClipboardDocumentListIcon />,
+        items: [
+            { key: 'sampul-cover', label: 'Sampul / Cover' },
         ],
     }
 ];
@@ -226,6 +234,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
             case 'analisis-hasil': return <AssessmentAnalysis {...commonProps} />;
             case 'penilaian-kokurikuler': return <AssessmentKokurikuler {...commonProps} />;
             case 'remedial-pengayaan': return <RemedialEnrichment {...commonProps} />;
+            case 'sampul-cover': return <CoverGenerator {...commonProps} />;
             default: return <div className="p-8 text-center bg-white rounded-lg shadow">Pilih menu untuk melihat konten.</div>;
         }
     };

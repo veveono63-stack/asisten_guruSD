@@ -7,7 +7,8 @@ import Notification, { NotificationType } from './Notification';
 import { generateContentWithRotation } from '../services/geminiService';
 import { Type } from '@google/genai';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface ProgramKokurikulerProps {
     selectedClass: string;
@@ -869,7 +870,6 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
         }
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] }); // F4 Landscape
 
             const margin = { top: 20, right: 10, bottom: 20, left: 10 };
@@ -1021,7 +1021,6 @@ const ProgramKokurikuler: React.FC<ProgramKokurikulerProps> = ({ selectedClass, 
         await new Promise(r => setTimeout(r, 50));
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] }); // F4
             const margin = { top: 10, left: 25, right: 15, bottom: 7 }; // Adjusted Top margin to 1cm
             const pageWidth = 215;

@@ -356,21 +356,41 @@ export const getLearningOutcomes = async (academicYear: string, classLevel: stri
 export const updateLearningOutcomes = async (academicYear: string, classLevel: string, subjectId: string, data: LearningOutcomesData, userId?: string): Promise<void> => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
-    // Simpan HANYA ke path per Kelas
-    const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    const root = getPathRoot(userId);
+    
+    // Simpan HANYA ke path per Kelas untuk menjaga isolasi data antar kelas
+    const docRef = doc(db, root, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
     await setDoc(docRef, data);
 };
 
 export const pullLearningOutcomesToTeacher = async (academicYear: string, classLevel: string, subjectId: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
     const classDocId = getClassDocId(classLevel);
     
-    // Admin Master tetap di level Fase untuk efisiensi input admin
-    const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
-    const adminSnap = await getDoc(adminRef);
+    // Ambil nama mapel guru untuk pencocokan berbasis nama jika ID (kode) tidak cocok
+    const teacherSubRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectId);
+    const teacherSubSnap = await getDoc(teacherSubRef);
+    const teacherSubName = teacherSubSnap.exists() ? teacherSubSnap.data().name : null;
+
+    // Coba ambil langsung dari path Kelas milik Admin (Induk)
+    const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
+    let adminSnap = await getDoc(adminRef);
+
+    // Jika tidak ketemu dengan ID, coba cari berdasarkan NAMA mapel di daftar mapel Admin pada kelas yang sama
+    if (!adminSnap.exists() && teacherSubName) {
+        const adminSubjectsRef = collection(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects');
+        const adminSubjectsSnap = await getDocs(adminSubjectsRef);
+        const matchingAdminSub = adminSubjectsSnap.docs.find(d => 
+            d.data().name.toLowerCase().trim() === teacherSubName.toLowerCase().trim()
+        );
+        
+        if (matchingAdminSub) {
+            const adminRefByName = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects', matchingAdminSub.id, 'learningOutcomes', 'main');
+            adminSnap = await getDoc(adminRefByName);
+        }
+    }
     
-    if (!adminSnap.exists()) throw new Error("Data Capaian Pembelajaran di induk admin belum diisi untuk fase ini.");
+    if (!adminSnap || !adminSnap.exists()) throw new Error(`Data Capaian Pembelajaran di induk admin belum diisi untuk ${classLevel}.`);
     
     // Simpan ke Guru di path per KELAS
     const teacherRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningOutcomes', 'main');
@@ -405,7 +425,9 @@ export const getLearningObjectives = async (academicYear: string, classLevel: st
 export const updateLearningObjectives = async (academicYear: string, classLevel: string, subjectId: string, data: LearningOutcomesData, userId?: string): Promise<void> => {
     const yearDocId = getAcademicYearDocId(academicYear);
     const classDocId = getClassDocId(classLevel);
-    const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+    const root = getPathRoot(userId);
+    
+    const docRef = doc(db, root, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
     const objectivesMap: any = {};
     data.elements.forEach(el => el.outcomes.forEach(cp => { if (cp.objectives) objectivesMap[cp.id] = cp.objectives; }));
     await setDoc(docRef, { objectivesMap });
@@ -413,11 +435,33 @@ export const updateLearningObjectives = async (academicYear: string, classLevel:
 
 export const pullLearningObjectivesToTeacher = async (academicYear: string, classLevel: string, subjectId: string, userId: string) => {
     const yearDocId = getAcademicYearDocId(academicYear);
-    const phaseDocId = getPhaseDocId(classLevel);
     const classDocId = getClassDocId(classLevel);
-    const adminRef = doc(db, 'schoolData', yearDocId, phaseDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
-    const adminSnap = await getDoc(adminRef);
-    if (!adminSnap.exists()) throw new Error("Data Tujuan Pembelajaran di induk admin belum diisi untuk fase ini.");
+
+    // Ambil nama mapel guru untuk pencocokan berbasis nama jika ID (kode) tidak cocok
+    const teacherSubRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectId);
+    const teacherSubSnap = await getDoc(teacherSubRef);
+    const teacherSubName = teacherSubSnap.exists() ? teacherSubSnap.data().name : null;
+
+    // Coba ambil langsung dari path Kelas milik Admin (Induk)
+    const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
+    let adminSnap = await getDoc(adminRef);
+
+    // Jika tidak ketemu dengan ID, coba cari berdasarkan NAMA mapel di daftar mapel Admin pada kelas yang sama
+    if (!adminSnap.exists() && teacherSubName) {
+        const adminSubjectsRef = collection(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects');
+        const adminSubjectsSnap = await getDocs(adminSubjectsRef);
+        const matchingAdminSub = adminSubjectsSnap.docs.find(d => 
+            d.data().name.toLowerCase().trim() === teacherSubName.toLowerCase().trim()
+        );
+        
+        if (matchingAdminSub) {
+            const adminRefByName = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects', matchingAdminSub.id, 'learningObjectives', 'main');
+            adminSnap = await getDoc(adminRefByName);
+        }
+    }
+
+    if (!adminSnap || !adminSnap.exists()) throw new Error(`Data Tujuan Pembelajaran di induk admin belum diisi untuk ${classLevel}.`);
+    
     const teacherRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectId, 'learningObjectives', 'main');
     await setDoc(teacherRef, adminSnap.data());
     return adminSnap.data();
@@ -677,10 +721,30 @@ export const pullATPDataToTeacher = async (academicYear: string, classLevel: str
     const rootPath = getPathRoot(userId);
     const semesters = ['Ganjil', 'Genap'];
     const results = { ganjil: { rows: [] } as ATPData, genap: { rows: [] } as ATPData };
+
+    // Ambil nama mapel guru untuk pencocokan berbasis nama jika ID (kode) tidak cocok
+    const teacherSubRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectCode);
+    const teacherSubSnap = await getDoc(teacherSubRef);
+    const teacherSubName = teacherSubSnap.exists() ? teacherSubSnap.data().name : null;
+
     for (const sem of semesters) {
         const docId = `${subjectCode}_${sem.toLowerCase()}`;
         const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'atp', docId);
-        const adminSnap = await getDoc(adminRef);
+        let adminSnap = await getDoc(adminRef);
+
+        // Fallback: Cari berdasarkan nama jika ID tidak ketemu
+        if (!adminSnap.exists() && teacherSubName) {
+            const adminSubjectsRef = collection(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects');
+            const adminSubjectsSnap = await getDocs(adminSubjectsRef);
+            const matchingAdminSub = adminSubjectsSnap.docs.find(d => 
+                d.data().name.toLowerCase().trim() === teacherSubName.toLowerCase().trim()
+            );
+            if (matchingAdminSub) {
+                const adminRefByName = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'atp', `${matchingAdminSub.id}_${sem.toLowerCase()}`);
+                adminSnap = await getDoc(adminRefByName);
+            }
+        }
+
         if (adminSnap.exists()) {
             const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'atp', docId);
             await setDoc(teacherRef, adminSnap.data());
@@ -729,7 +793,27 @@ export const pullKKTPToTeacher = async (academicYear: string, classLevel: string
     const rootPath = getPathRoot(userId);
     const docId = `${subjectCode}_${semester.toLowerCase()}`;
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'kktp', docId);
-    const adminSnap = await getDoc(adminRef);
+    let adminSnap = await getDoc(adminRef);
+
+    // Fallback: Cari berdasarkan nama jika ID tidak ketemu
+    if (!adminSnap.exists()) {
+        const teacherSubRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectCode);
+        const teacherSubSnap = await getDoc(teacherSubRef);
+        const teacherSubName = teacherSubSnap.exists() ? teacherSubSnap.data().name : null;
+
+        if (teacherSubName) {
+            const adminSubjectsRef = collection(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects');
+            const adminSubjectsSnap = await getDocs(adminSubjectsRef);
+            const matchingAdminSub = adminSubjectsSnap.docs.find(d => 
+                d.data().name.toLowerCase().trim() === teacherSubName.toLowerCase().trim()
+            );
+            if (matchingAdminSub) {
+                const adminRefByName = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'kktp', `${matchingAdminSub.id}_${semester.toLowerCase()}`);
+                adminSnap = await getDoc(adminRefByName);
+            }
+        }
+    }
+
     if (!adminSnap.exists()) throw new Error("Data KKTP di induk admin belum diisi untuk mata pelajaran dan semester ini.");
     const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'kktp', docId);
     await setDoc(teacherRef, adminSnap.data());
@@ -763,7 +847,27 @@ export const pullProtaToTeacher = async (academicYear: string, classLevel: strin
     const classDocId = getClassDocId(classLevel);
     const rootPath = getPathRoot(userId);
     const adminRef = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'prota', subjectCode);
-    const adminSnap = await getDoc(adminRef);
+    let adminSnap = await getDoc(adminRef);
+
+    // Fallback: Cari berdasarkan nama jika ID tidak ketemu
+    if (!adminSnap.exists()) {
+        const teacherSubRef = doc(db, `teachersData/${userId}/schoolData`, yearDocId, classDocId, 'data', 'subjects', subjectCode);
+        const teacherSubSnap = await getDoc(teacherSubRef);
+        const teacherSubName = teacherSubSnap.exists() ? teacherSubSnap.data().name : null;
+
+        if (teacherSubName) {
+            const adminSubjectsRef = collection(db, 'schoolData', yearDocId, classDocId, 'data', 'subjects');
+            const adminSubjectsSnap = await getDocs(adminSubjectsRef);
+            const matchingAdminSub = adminSubjectsSnap.docs.find(d => 
+                d.data().name.toLowerCase().trim() === teacherSubName.toLowerCase().trim()
+            );
+            if (matchingAdminSub) {
+                const adminRefByName = doc(db, 'schoolData', yearDocId, classDocId, 'data', 'prota', matchingAdminSub.id);
+                adminSnap = await getDoc(adminRefByName);
+            }
+        }
+    }
+
     if (!adminSnap.exists()) throw new Error("Data alokasi waktu PROTA di induk admin belum diisi untuk mata pelajaran ini.");
     const teacherRef = doc(db, rootPath, yearDocId, classDocId, 'data', 'prota', subjectCode);
     await setDoc(teacherRef, adminSnap.data());
@@ -779,13 +883,48 @@ export const getProsem = async (academicYear: string, classLevel: string, subjec
     const docRef = doc(db, getPathRoot(userId), yearDocId, classDocId, 'data', 'prosem', docId);
     const docSnap = await getDoc(docRef);
     let storedData = docSnap.exists() ? docSnap.data() : {};
+    
+    const defaultPekan: ProsemBulanCheckboxes = {
+        b1_m1: false, b1_m2: false, b1_m3: false, b1_m4: false, b1_m5: false,
+        b2_m1: false, b2_m2: false, b2_m3: false, b2_m4: false, b2_m5: false,
+        b3_m1: false, b3_m2: false, b3_m3: false, b3_m4: false, b3_m5: false,
+        b4_m1: false, b4_m2: false, b4_m3: false, b4_m4: false, b4_m5: false,
+        b5_m1: false, b5_m2: false, b5_m3: false, b5_m4: false, b5_m5: false,
+        b6_m1: false, b6_m2: false, b6_m3: false, b6_m4: false, b6_m5: false,
+    };
+
     const prosemRows: ProsemRow[] = [];
     protaRowsForSemester.forEach(protaRow => {
         const lingkupMateriLines = (protaRow.materialScope || '').split('\n').filter(line => line.trim() !== '');
         lingkupMateriLines.forEach((lingkup, index) => {
             const id = `${protaRow.id}_${index}`;
             const storedRow = storedData[id] || {};
-            prosemRows.push({ id, protaRowId: protaRow.id, materi: protaRow.material, atp: protaRow.learningGoalPathway, lingkupMateri: lingkup, alokasiWaktu: storedRow.alokasiWaktu || 0, pekan: storedRow.pekan || { b1_m1: false }, keterangan: storedRow.keterangan || '', isSLM: false });
+            prosemRows.push({ 
+                id, 
+                protaRowId: protaRow.id, 
+                materi: protaRow.material, 
+                atp: protaRow.learningGoalPathway, 
+                lingkupMateri: lingkup, 
+                alokasiWaktu: storedRow.alokasiWaktu || 0, 
+                pekan: storedRow.pekan || { ...defaultPekan }, 
+                keterangan: storedRow.keterangan || '', 
+                isSLM: false 
+            });
+        });
+        
+        // Pastikan baris SLM selalu ada untuk setiap materi Prota
+        const slmId = `${protaRow.id}_slm`;
+        const storedSLM = storedData[slmId] || {};
+        prosemRows.push({
+            id: slmId,
+            protaRowId: protaRow.id,
+            materi: protaRow.material,
+            atp: protaRow.learningGoalPathway,
+            lingkupMateri: "SUMATIF LINGKUP MATERI",
+            alokasiWaktu: storedSLM.alokasiWaktu || 2,
+            pekan: storedSLM.pekan || { ...defaultPekan },
+            keterangan: storedSLM.keterangan || '',
+            isSLM: true
         });
     });
     return { rows: prosemRows };

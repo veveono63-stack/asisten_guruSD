@@ -5,8 +5,8 @@ import Notification, { NotificationType } from './Notification';
 import { PencilIcon, SparklesIcon, ArrowDownTrayIcon, ArrowPathIcon } from './Icons';
 import { generateContentWithRotation } from '../services/geminiService';
 import { Type } from '@google/genai';
-
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface ProsemProps {
     selectedClass: string;
@@ -65,7 +65,8 @@ const WrappingTextarea: React.FC<{ value: string; disabled: boolean; className?:
 const sortDateString = (dateString: string): string => {
     if (!dateString || typeof dateString !== 'string') return '';
     const dates = dateString.split(',').map(d => d.trim()).filter(d => d);
-    dates.sort((a, b) => {
+    const uniqueDates = Array.from(new Set(dates));
+    uniqueDates.sort((a, b) => {
         const partsA = a.split('-');
         const partsB = b.split('-');
         if (partsA.length !== 3 || partsB.length !== 3) return 0;
@@ -75,7 +76,7 @@ const sortDateString = (dateString: string): string => {
         const dateB = new Date(yearB, monthB - 1, dayB);
         return dateA.getTime() - dateB.getTime();
     });
-    return dates.join(', ');
+    return uniqueDates.join(', ');
 };
 
 const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) => {
@@ -234,6 +235,9 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
             } else if (slmIndex !== -1) {
                 rows[slmIndex].isSLM = true;
                 rows[slmIndex].lingkupMateri = "SUMATIF LINGKUP MATERI";
+                if (rows[slmIndex].alokasiWaktu > 2) {
+                    rows[slmIndex].alokasiWaktu = 2;
+                }
             }
             finalizedGroups.push(rows);
         });
@@ -332,14 +336,20 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
                    
                 Aturan Penjadwalan (SANGAT KETAT):
                 1. Urutan materi HARUS berurutan sesuai daftar yang diberikan.
-                2. Setiap materi/tema memiliki 'totalProtaJP'. Anda harus membagi angka ini ke sub-topik (termasuk SLM) secara proporsional.
-                3. 'SUMATIF LINGKUP MATERI' (isSLM: true) wajib ada di akhir setiap tema dengan alokasi 1-2 JP.
+                2. 'totalProtaJP' adalah jatah TOTAL JP untuk satu tema. Anda harus membagi angka ini ke sub-topik DAN Sumatif Lingkup Materi (SLM) di dalam tema tersebut.
+                3. UNTUK 'SUMATIF LINGKUP MATERI' (isSLM: true):
+                   - Alokasi waktu MAKSIMAL 2 JP (bisa 1 JP jika total JP tema kecil).
+                   - HARUS mengurangi jatah 'totalProtaJP' tema tersebut (Sub-topik + SLM = totalProtaJP).
+                   - WAJIB DIJADWALKAN: HANYA BOLEH menggunakan 1 sesi tanggal (sessionIds berisi tepat 1 ID).
+                   - WAJIB memiliki tanggal di kolom 'keterangan'.
+                   - Wajib diletakkan di akhir setiap tema.
                 4. Gunakan 'teachingSessions' secara berurutan. Satu sesi hanya boleh digunakan untuk SATU sub-topik hingga JP sesi habis atau sub-topik berganti.
-                5. PENTING: Jika alokasi JP sebuah sub-topik lebih besar dari JP sesi saat ini, sub-topik tersebut HARUS mengambil satu atau lebih sesi berikutnya secara berurutan (sessionIds) hingga kebutuhannya terpenuhi.
-                6. Kolom 'sessionIds' harus berisi array string ID sesi yang digunakan oleh sub-topik tersebut.
-                7. Kolom 'keterangan' HARUS berisi daftar tanggal (format dd-mm-yyyy) dari SEMUA sesi yang digunakan, dipisahkan koma (contoh: "14-07-2025, 21-07-2025").
-                8. JANGAN ADA TANGGAL YANG DIPAKAI DUA KALI UNTUK SUB-TOPIK YANG BERBEDA. 
-                9. Pastikan jumlah alokasiWaktu untuk seluruh sub-topik dalam satu tema sama dengan 'totalProtaJP' tema tersebut.
+                5. Jika alokasi JP sebuah sub-topik (NON-SLM) lebih besar dari JP sesi saat ini, sub-topik tersebut HARUS mengambil satu atau lebih sesi berikutnya secara berurutan (sessionIds) hingga kebutuhannya terpenuhi.
+                6. SEMUA baris dalam output (termasuk SLM) WAJIB memiliki 'sessionIds' yang valid dan 'keterangan' tanggal yang sesuai.
+                7. Kolom 'sessionIds' harus berisi array string ID sesi yang digunakan oleh sub-topik tersebut.
+                8. Kolom 'keterangan' HARUS berisi daftar tanggal (format dd-mm-yyyy) dari SEMUA sesi yang digunakan, dipisahkan koma (contoh: "14-07-2025, 21-07-2025").
+                9. JANGAN ADA TANGGAL YANG DIPAKAI DUA KALI UNTUK SUB-TOPIK YANG BERBEDA DI SELURUH TABEL (Global uniqueness).
+                10. Pastikan jumlah alokasiWaktu untuk seluruh sub-topik (termasuk SLM) dalam satu tema sama dengan 'totalProtaJP' tema tersebut.
 
                 Output JSON: Array of objects [{"id": "...", "alokasiWaktu": number, "sessionIds": [...], "keterangan": "..."}]
             `;
@@ -389,7 +399,15 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
                                     if (weekKey && weekKey in newPekan) newPekan[weekKey as keyof ProsemBulanCheckboxes] = true;
                                 });
                             }
-                            return { ...row, alokasiWaktu: aiResult.alokasiWaktu, pekan: newPekan, keterangan: sortDateString(aiResult.keterangan) };
+                            let finalAlokasi = aiResult.alokasiWaktu;
+                            if (row.isSLM && finalAlokasi > 2) finalAlokasi = 2;
+
+                            return { 
+                                ...row, 
+                                alokasiWaktu: finalAlokasi, 
+                                pekan: newPekan, 
+                                keterangan: sortDateString(aiResult.keterangan) 
+                            };
                         }
                         return row;
                     })
@@ -440,7 +458,6 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
         }
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] });
 
             const margin = { top: 15, left: 10, right: 10, bottom: 7 }; 
@@ -486,7 +503,6 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
                 body.push([{ content: `MATERI/TEMA: ${group[0].materi.toUpperCase()}`, colSpan: 34, styles: { fontStyle: 'bold', fillColor: [245, 245, 245] } }]);
                 
                 const tps = (group[0].atp || '').split('\n').filter(l => l.trim());
-                /* COMMENT: Changed PDF numbering to bullet points in ATP column */
                 const formattedTps = tps.map(tp => {
                     const cleanTp = tp.replace(/^[0-9\.\-\s•]+/, '').trim();
                     return `• ${cleanTp}`;
@@ -685,7 +701,7 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
                 <div className="mb-6 p-4 border-2 border-dashed border-purple-300 bg-purple-50 rounded-lg flex items-center justify-between">
                     <div>
                         <h3 className="text-lg font-semibold text-purple-800">Otomatisasi Penjadwalan</h3>
-                        <p className="text-sm text-purple-700">AI akan menyesuaikan kalender dan jadwal ke kolom pekan. Alokasi per materi termasuk Sumatif Lingkup Materi.</p>
+                        <p className="text-sm text-purple-700">AI akan menyesuaikan kalender dan jadwal ke kolom pekan. Alokasi per materi termasuk Sumatif Lingkup Materi (Max 2 JP).</p>
                     </div>
                     <button onClick={handleGenerateWithAI} disabled={isSaving || isGenerating} className="btn-ai">
                         {isGenerating ? (<svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : <SparklesIcon />}
@@ -721,7 +737,6 @@ const Prosem: React.FC<ProsemProps> = ({ selectedClass, selectedYear, userId }) 
                                                     <div className="space-y-1 p-1 pr-6">
                                                         {tps.map((tp, tpIdx) => (
                                                             <div key={tpIdx} className="flex items-start text-[14px]">
-                                                                {/* COMMENT: Changed table numbering to bullet point in ATP column */}
                                                                 <span className="shrink-0 w-8 font-bold text-center">•</span>
                                                                 <span className="flex-1">{tp.replace(/^[0-9\.\-\s•]+/, '').trim()}</span>
                                                             </div>

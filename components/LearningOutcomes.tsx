@@ -5,7 +5,8 @@ import { getSubjects, getLearningOutcomes, updateLearningOutcomes, getSchoolIden
 import Notification, { NotificationType } from './Notification';
 import { PencilIcon, TrashIcon, SparklesIcon, ArrowDownTrayIcon, ArrowPathIcon } from './Icons';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface LearningOutcomesProps {
     selectedClass: string;
@@ -25,6 +26,7 @@ const subjectSortOrder = [
     'bahasa jawa',
     'pendidikan lingkungan hidup',
     'koding dan kecerdasan artifisial',
+    'koding dan kecerdasan artificial',
 ];
 
 const masterArtSubjects = ['Seni Rupa', 'Seni Musik', 'Seni Tari', 'Seni Teater'];
@@ -465,7 +467,6 @@ const LearningOutcomes: React.FC<LearningOutcomesProps> = ({ selectedClass, sele
         }
 
         try {
-            const { jsPDF } = jspdf;
             // F4 size in mm: [215, 330]. Portrait.
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] });
 

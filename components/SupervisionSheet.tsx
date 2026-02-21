@@ -5,7 +5,8 @@ import { getSupervisionLog, updateSupervisionLog, getTeacherProfile, getSchoolId
 import Notification, { NotificationType } from './Notification';
 import { PencilIcon, TrashIcon, ArrowDownTrayIcon } from './Icons';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface SupervisionSheetProps {
     selectedClass: string;
@@ -133,7 +134,6 @@ const SupervisionSheet: React.FC<SupervisionSheetProps> = ({ selectedClass, sele
         await new Promise(r => setTimeout(r, 50));
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] });
 
             // Margin: Kiri 15mm (ruang jilid), Atas 15mm, Lainnya 10mm

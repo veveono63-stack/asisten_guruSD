@@ -77,7 +77,7 @@ const Prota: React.FC<ProtaProps> = ({ selectedClass, selectedYear, userId }) =>
                 fetchedSubjects.forEach(s => {
                     if (!s.name.toLowerCase().startsWith('seni')) {
                         if (!regularSubjectsMap.has(s.name)) {
-                            regularSubjectsMap.set(s.name, { id: s.code.toLowerCase(), name: s.name });
+                            regularSubjectsMap.set(s.name, { id: s.id, name: s.name });
                         }
                     }
                 });

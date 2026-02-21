@@ -33,6 +33,7 @@ import StudentGradesList from './StudentGradesList';
 import AssessmentAnalysis from './AssessmentAnalysis'; 
 import AssessmentKokurikuler from './AssessmentKokurikuler';
 import RemedialEnrichment from './RemedialEnrichment';
+import CoverGenerator from './CoverGenerator';
 import Notification, { NotificationType } from './Notification';
 
 import { 
@@ -114,6 +115,13 @@ const adminMenu = [
             { key: 'analisis-hasil', label: 'Analisis Hasil Penilaian' },
             { key: 'penilaian-kokurikuler', label: 'Penilaian Kokurikuler' },
             { key: 'remedial-pengayaan', label: 'Remedial / Pengayaan' },
+        ],
+    },
+    {
+        category: 'F. SAMPUL & COVER',
+        icon: <ClipboardDocumentListIcon />,
+        items: [
+            { key: 'sampul-cover', label: 'Sampul / Cover' },
         ],
     }
 ];
@@ -241,6 +249,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 return <AssessmentKokurikuler selectedClass={selectedClass} selectedYear={selectedYear} />;
             case 'remedial-pengayaan':
                 return <RemedialEnrichment selectedClass={selectedClass} selectedYear={selectedYear} />;
+            case 'sampul-cover':
+                return <CoverGenerator selectedClass={selectedClass} selectedYear={selectedYear} />;
             default:
                 return (
                     <PlaceholderContent 

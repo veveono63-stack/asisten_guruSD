@@ -7,8 +7,8 @@ import { generateContentWithRotation } from '../services/geminiService';
 import { Type } from '@google/genai';
 import { SparklesIcon, ArrowDownTrayIcon, PrinterIcon } from './Icons';
 
-/* COMMENT: Added missing jspdf declaration */
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface RemedialEnrichmentProps {
     selectedClass: string;
@@ -219,7 +219,6 @@ const RemedialEnrichment: React.FC<RemedialEnrichmentProps> = ({ selectedClass, 
         await new Promise(r => setTimeout(r, 100));
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215, 330] }); // F4
             const margin = { top: 15, left: 25, right: 15, bottom: 20 };
             const pageWidth = 215;

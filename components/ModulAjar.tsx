@@ -93,7 +93,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
                 const regularSubjectsMap = new Map<string, { id: string; name: string }>();
                 fetchedSubjects.forEach(s => {
                     if (!s.name.toLowerCase().startsWith('seni')) {
-                        if (!regularSubjectsMap.has(s.name)) regularSubjectsMap.set(s.name, { id: s.code.toLowerCase(), name: s.name });
+                        if (!regularSubjectsMap.has(s.name)) regularSubjectsMap.set(s.name, { id: s.id, name: s.name });
                     }
                 });
                 let dropdownSubjects = Array.from(regularSubjectsMap.values());
@@ -117,7 +117,7 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
         if (selectedSubjectId === 'seni-budaya-group') return activeArtTab;
         const subject = subjectsForDropdown.find(s => s.id === selectedSubjectId);
         return subject ? subject.name : '';
-    }, [subjectsForDropdown, selectedSubjectId, activeArtTab]);
+    }, [selectedSubjectId, subjectsForDropdown, activeArtTab]);
 
     useEffect(() => {
         if (!finalSubjectIdForApi) return;
@@ -475,7 +475,13 @@ const ModulAjarComponent: React.FC<ModulAjarProps> = ({ selectedClass, selectedY
 
             addTitle("PERENCANAAN PEMBELAJARAN MENDALAM");
             y += 2;
-            const phase = selectedClass.includes('I') || selectedClass.includes('II') ? 'A' : (selectedClass.includes('III') || selectedClass.includes('IV') ? 'B' : 'C');
+            
+            // PERBAIKAN LOGIKA FASE: Menggunakan pemetaan yang presisi sesuai standar user
+            const romanMap: { [key: string]: number } = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6 };
+            const romanStr = selectedClass.replace('Kelas ', '');
+            const classNum = romanMap[romanStr] || 0;
+            const phase = classNum <= 2 ? 'A' : (classNum <= 4 ? 'B' : 'C');
+
             addLabelValue("Satuan Pendidikan", schoolIdentity?.schoolName || "");
             addLabelValue("Nama Penyusun", teacher?.fullName || "");
             addLabelValue("Mata Pelajaran", selectedSubjectName);

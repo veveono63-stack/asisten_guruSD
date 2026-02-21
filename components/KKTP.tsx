@@ -6,7 +6,8 @@ import { PencilIcon, SparklesIcon, ArrowDownTrayIcon, ArrowPathIcon } from './Ic
 import { Type } from '@google/genai';
 import { generateContentWithRotation } from '../services/geminiService';
 
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface KKTPProps {
     selectedClass: string;
@@ -107,7 +108,7 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
                 fetchedSubjects.forEach(s => {
                     if (!s.name.toLowerCase().startsWith('seni')) {
                          if (!regularSubjectsMap.has(s.name)) {
-                            regularSubjectsMap.set(s.name, { id: s.code.toLowerCase(), name: s.name });
+                            regularSubjectsMap.set(s.name, { id: s.id, name: s.name });
                         }
                     }
                 });
@@ -333,7 +334,6 @@ const KKTP: React.FC<KKTPProps> = ({ selectedClass, selectedYear, userId }) => {
         }
 
         try {
-            const { jsPDF } = jspdf;
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330, 215] }); 
 
             const margin = { top: 15, left: 25, right: 15, bottom: 7 }; 
